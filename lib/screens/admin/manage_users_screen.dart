@@ -4,6 +4,9 @@ import '../../services/api_service.dart';
 import '../../models/user.dart';
 import '../../utils/constants.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/custom_text_field.dart';
+import '../../widgets/custom_button.dart';
+import '../../utils/validators.dart';
 
 class ManageUsersScreen extends StatefulWidget {
   const ManageUsersScreen({super.key});
@@ -15,312 +18,430 @@ class ManageUsersScreen extends StatefulWidget {
 class _ManageUsersScreenState extends State<ManageUsersScreen> {
   List<User> _users = [];
   bool _isLoading = true;
-  int _currentPage = 1;
-  bool _hasMoreData = true;
-  final int _itemsPerPage = 10;
-  final TextEditingController _searchController = TextEditingController();
-  
+  bool _isSubmitting = false;
+
+  // Form controllers
+  final _formKey = GlobalKey<FormState>();
+  final _fullnameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _sectorController = TextEditingController();
+  final _positionController = TextEditingController();
+
+  String? _selectedRole;
+  User? _editingUser;
+
   @override
   void initState() {
     super.initState();
     _loadUsers();
   }
 
-  Future<void> _loadUsers({bool refresh = false}) async {
-    if (refresh) {
-      setState(() {
-        _currentPage = 1;
-        _users = [];
-        _hasMoreData = true;
-        _isLoading = true;
-      });
-    }
-
-    try {
-      final response = await ApiService.getUsers(
-        page: _currentPage,
-        limit: _itemsPerPage,
-      );
-
-      final List<User> newUsers = (response['data'] as List)
-          .map((json) => User.fromJson(json))
-          .toList();
-
-      setState(() {
-        if (refresh) {
-          _users = newUsers;
-        } else {
-          _users.addAll(newUsers);
-        }
-        _hasMoreData = newUsers.length == _itemsPerPage;
-        _currentPage++;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showErrorToast('Error loading users: ${e.toString()}');
-    }
+  @override
+  void dispose() {
+    _fullnameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _sectorController.dispose();
+    _positionController.dispose();
+    super.dispose();
   }
 
-  Future<void> _approveUser(User user, bool approve) async {
-    try {
-      await ApiService.approveUser(user.userId!, approve);
-      
-      setState(() {
-        final index = _users.indexWhere((u) => u.userId == user.userId);
-        if (index != -1) {
-          _users[index] = User(
-            userId: user.userId,
-            sector: user.sector,
-            fullname: user.fullname,
-            position: user.position,
-            email: user.email,
-            role: user.role,
-            isVerified: approve,
-            createdAt: user.createdAt,
-          );
-        }
-      });
+  Future<void> _loadUsers() async {
+    setState(() {
+      _isLoading = true;
+    });
 
+    try {
+      final response = await ApiService.getUsersAdmin();
+      if (response['success'] == true) {
+        final usersData = response['data'] as List;
+        setState(() {
+          _users = usersData.map((userData) => User.fromJson(userData)).toList();
+        });
+      }
+    } catch (e) {
       Fluttertoast.showToast(
-        msg: approve ? 'User approved successfully' : 'User rejected',
-        backgroundColor: approve ? AppColors.successColor : AppColors.errorColor,
+        msg: 'Error loading users: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
         textColor: Colors.white,
       );
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _addUser() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final userData = {
+        'fullname': _fullnameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'password': _passwordController.text.trim(),
+        'sector': _sectorController.text.trim(),
+        'position': _positionController.text.trim(),
+        'role': _selectedRole!,
+      };
+
+      final response = await ApiService.createUser(userData);
+      if (response['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'User created successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
+        _clearForm();
+        _loadUsers();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to create user');
+      }
     } catch (e) {
-      _showErrorToast('Error updating user: ${e.toString()}');
+      Fluttertoast.showToast(
+        msg: 'Error creating user: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
+
+    setState(() {
+      _isSubmitting = false;
+    });
+  }
+
+  Future<void> _updateUser() async {
+    if (!_formKey.currentState!.validate() || _editingUser == null) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final userData = {
+        'fullname': _fullnameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'sector': _sectorController.text.trim(),
+        'position': _positionController.text.trim(),
+        'role': _selectedRole!,
+      };
+
+      // Only include password if it's not empty
+      if (_passwordController.text.isNotEmpty) {
+        userData['password'] = _passwordController.text.trim();
+      }
+
+      final response = await ApiService.updateUser(_editingUser!.userId!, userData);
+      if (response['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'User updated successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
+        _clearForm();
+        _loadUsers();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to update user');
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Error updating user: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
+
+    setState(() {
+      _isSubmitting = false;
+    });
+  }
+
+  Future<void> _deleteUser(User user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete User'),
+        content: Text('Are you sure you want to delete ${user.fullname}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await ApiService.deleteUserAdmin(user.userId!);
+      if (response['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'User deleted successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
+        _loadUsers();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to delete user');
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Error deleting user: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
     }
   }
 
-  void _showErrorToast(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: AppColors.errorColor,
-      textColor: Colors.white,
-    );
+  void _editUser(User user) {
+    setState(() {
+      _editingUser = user;
+      _fullnameController.text = user.fullname;
+      _emailController.text = user.email;
+      _sectorController.text = user.sector;
+      _positionController.text = user.position;
+      _selectedRole = user.role;
+      _passwordController.clear();
+    });
+  }
+
+  void _clearForm() {
+    _formKey.currentState?.reset();
+    _fullnameController.clear();
+    _emailController.clear();
+    _passwordController.clear();
+    _sectorController.clear();
+    _positionController.clear();
+    _selectedRole = null;
+    _editingUser = null;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Manage Users', style: TextStyle(color: Colors.white)),
-        backgroundColor: AppColors.primaryColor,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Search Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search users...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-              ),
-              onChanged: (value) {
-                // Implement search functionality
-              },
-            ),
-          ),
-          
-          // Users List
-          Expanded(
-            child: _isLoading && _users.isEmpty
-                ? const Center(child: LoadingWidget())
-                : RefreshIndicator(
-                    onRefresh: () => _loadUsers(refresh: true),
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _users.length + (_hasMoreData ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index == _users.length) {
-                          // Load more indicator
-                          if (_hasMoreData) {
-                            _loadUsers();
-                            return const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(16),
-                                child: LoadingWidget(),
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        }
-
-                        final user = _users[index];
-                        return _buildUserCard(user);
-                      },
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserCard(User user) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // User Header
-            Row(
+      body: _isLoading
+          ? const LoadingWidget()
+          : Column(
               children: [
+                // Form Section
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: user.isVerified 
-                        ? AppColors.successColor.withOpacity(0.1)
-                        : AppColors.errorColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    color: user.isVerified ? AppColors.successColor : AppColors.errorColor,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.fullname,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        user.position,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: user.isVerified 
-                        ? AppColors.successColor
-                        : AppColors.errorColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    user.isVerified ? 'Approved' : 'Pending',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                    color: Colors.grey[50],
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey[300]!),
                     ),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        Text(
+                          _editingUser == null ? 'Add New User' : 'Edit User',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _fullnameController,
+                                hintText: 'Full Name',
+                                labelText: 'Full Name',
+                                validator: Validators.validateRequired,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _emailController,
+                                hintText: 'Email',
+                                labelText: 'Email',
+                                validator: Validators.validateEmail,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _sectorController,
+                                hintText: 'Sector',
+                                labelText: 'Sector',
+                                validator: Validators.validateRequired,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _positionController,
+                                hintText: 'Position',
+                                labelText: 'Position',
+                                validator: Validators.validateRequired,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _passwordController,
+                                hintText: _editingUser == null ? 'Password' : 'New Password (optional)',
+                                labelText: _editingUser == null ? 'Password' : 'New Password (optional)',
+                                obscureText: true,
+                                validator: _editingUser == null 
+                                    ? Validators.validateStrongPassword
+                                    : (value) {
+                                        if (value != null && value.isNotEmpty) {
+                                          return Validators.validateStrongPassword(value);
+                                        }
+                                        return null;
+                                      },
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _selectedRole,
+                                decoration: const InputDecoration(
+                                  labelText: 'Role',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                                  DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedRole = value;
+                                  });
+                                },
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please select a role';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomButton(
+                                text: _editingUser == null ? 'Add User' : 'Update User',
+                                onPressed: _editingUser == null ? _addUser : _updateUser,
+                                isLoading: _isSubmitting,
+                              ),
+                            ),
+                            if (_editingUser != null) ...[
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: CustomButton(
+                                  text: 'Cancel',
+                                  onPressed: _clearForm,
+                                  backgroundColor: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Users List
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _users.length,
+                    itemBuilder: (context, index) {
+                      final user = _users[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: user.role == 'admin' 
+                                ? AppColors.errorColor 
+                                : AppColors.primaryColor,
+                            child: Text(
+                              user.fullname[0].toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(user.fullname),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Email: ${user.email}'),
+                              Text('Role: ${user.role.toUpperCase()}'),
+                              Text('Sector: ${user.sector}'),
+                              Text('Position: ${user.position}'),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                onPressed: () => _editUser(user),
+                                icon: const Icon(Icons.edit),
+                                color: AppColors.primaryColor,
+                              ),
+                              IconButton(
+                                onPressed: () => _deleteUser(user),
+                                icon: const Icon(Icons.delete),
+                                color: AppColors.errorColor,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
             ),
-            
-            const SizedBox(height: 12),
-            
-            // User Details
-            _buildDetailRow('Email', user.email),
-            _buildDetailRow('Sector', user.sector),
-            _buildDetailRow('Role', user.role.toUpperCase()),
-            
-            if (!user.isVerified) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _approveUser(user, true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.successColor,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Approve'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _approveUser(user, false),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.errorColor,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Reject'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
     );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 60,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(color: Colors.black54),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }

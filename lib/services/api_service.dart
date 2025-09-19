@@ -19,6 +19,37 @@ class ApiService {
   static String _url(String path) {
     return '$baseUrl$apiVersion$path';
   }
+
+  // Test API connectivity
+  static Future<bool> testApiConnection() async {
+    try {
+      debugPrint('Testing API connection to: $baseUrl$apiVersion');
+      
+      // Try multiple endpoints to test connectivity
+      final endpoints = ['/health', '/auth/login', '/criminal-records'];
+      
+      for (String endpoint in endpoints) {
+        try {
+          final response = await http.get(
+            Uri.parse('$baseUrl$apiVersion$endpoint'),
+            headers: {'Content-Type': 'application/json'},
+          );
+          debugPrint('Health check response for $endpoint: ${response.statusCode} - ${response.body}');
+          if (response.statusCode == 200 || response.statusCode == 401 || response.statusCode == 404) {
+            // Any of these status codes means the server is reachable
+            return true;
+          }
+        } catch (e) {
+          debugPrint('Failed to reach $endpoint: $e');
+        }
+      }
+      
+      return false;
+    } catch (e) {
+      debugPrint('API connection test failed: $e');
+      return false;
+    }
+  }
   
   static Future<Map<String, String>> _getJsonHeaders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -42,25 +73,69 @@ class ApiService {
   static Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       debugPrint('Attempting login for email: $email');
+      debugPrint('API URL: ${_url('/auth/login')}');
+      
+      final requestBody = jsonEncode({'email': email, 'password': password});
+      debugPrint('Request body: $requestBody');
+      
       final response = await http.post(
         Uri.parse(_url('/auth/login')),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
+        body: requestBody,
       );
 
       debugPrint('Login response status: ${response.statusCode}');
+      debugPrint('Login response headers: ${response.headers}');
       debugPrint('Login response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data;
+        // Handle the actual API response structure from Postman
+        if (data['success'] == true) {
+          // The API returns data in data.user and data.tokens structure
+          if (data['data'] != null && data['data']['tokens'] != null) {
+            return {
+              'success': true,
+              'user': data['data']['user'],
+              'token': data['data']['tokens']['accessToken'],
+              'refreshToken': data['data']['tokens']['refreshToken'],
+            };
+          } else {
+            throw Exception(data['message'] ?? 'Login failed: Invalid response structure');
+          }
+        } else {
+          throw Exception(data['message'] ?? 'Login failed: Invalid credentials');
+        }
+      } else if (response.statusCode == 401) {
+        final errorData = jsonDecode(response.body);
+        final message = errorData['message'] ?? 'Invalid email or password';
+        if (message.contains('approval') || message.contains('approve')) {
+          throw Exception('Your account is pending admin approval. Please wait for approval.');
+        }
+        throw Exception(message);
+      } else if (response.statusCode == 422) {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Invalid input data');
+      } else if (response.statusCode == 500) {
+        throw Exception('Server error: Please try again later');
       } else {
         final errorBody = response.body;
-        throw Exception('Login failed: $errorBody');
+        try {
+          final errorData = jsonDecode(errorBody);
+          throw Exception(errorData['message'] ?? 'Login failed');
+        } catch (e) {
+          throw Exception('Login failed: $errorBody');
+        }
       }
     } catch (e) {
       debugPrint('Login error: $e');
-      throw Exception('Network error: $e');
+      if (e.toString().contains('SocketException') || e.toString().contains('HandshakeException')) {
+        throw Exception('Network error: Please check your internet connection');
+      } else if (e.toString().contains('TimeoutException')) {
+        throw Exception('Request timeout: Please try again');
+      } else {
+        throw Exception(e.toString());
+      }
     }
   }
 
@@ -737,18 +812,24 @@ class ApiService {
     }
   }
 
-  // NIDA Data Lookup Endpoints
+  // NIDA Data Lookup Endpoints - Updated to use correct API endpoints
   static Future<RwandanCitizen?> searchRwandanCitizen(String idNumber) async {
     try {
+      // Use the criminal records search endpoint which returns person data
       final response = await http.get(
-        Uri.parse(_url('/nida/rwandan-citizens/search/$idNumber')),
+        Uri.parse(_url('/criminal-records/search/$idNumber')),
         headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['data'] != null) {
-          return RwandanCitizen.fromJson(data['data']);
+        if (data['success'] == true && data['data'] != null) {
+          final responseData = data['data'];
+          
+          // Check if person exists and has citizen data
+          if (responseData['person'] != null && responseData['personType'] == 'citizen') {
+            return RwandanCitizen.fromJson(responseData['person']);
+          }
         }
         return null;
       } else if (response.statusCode == 404) {
@@ -763,15 +844,21 @@ class ApiService {
 
   static Future<PassportHolder?> searchPassportHolder(String passportNumber) async {
     try {
+      // Use the criminal records search endpoint which returns person data
       final response = await http.get(
-        Uri.parse(_url('/nida/passport-holders/search/$passportNumber')),
+        Uri.parse(_url('/criminal-records/search/$passportNumber')),
         headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['data'] != null) {
-          return PassportHolder.fromJson(data['data']);
+        if (data['success'] == true && data['data'] != null) {
+          final responseData = data['data'];
+          
+          // Check if person exists and has passport data
+          if (responseData['person'] != null && responseData['personType'] == 'passport') {
+            return PassportHolder.fromJson(responseData['person']);
+          }
         }
         return null;
       } else if (response.statusCode == 404) {
@@ -787,30 +874,39 @@ class ApiService {
   // Universal person search that checks both citizens and passport holders
   static Future<Map<String, dynamic>?> searchPersonData(String idNumber) async {
     try {
-      // Check if it looks like a passport (contains letters or not exactly 16 digits)
-      final bool looksLikePassport = RegExp(r'^[A-Za-z]').hasMatch(idNumber) || idNumber.length != 16;
-      
-      if (looksLikePassport) {
-        // Search passport holders first for passport-like IDs
-        final passportHolder = await searchPassportHolder(idNumber);
-        if (passportHolder != null) {
-          return {
-            'type': 'passport',
-            'data': passportHolder,
-          };
+      // Use the criminal records search endpoint which returns person data
+      final response = await http.get(
+        Uri.parse(_url('/criminal-records/search/$idNumber')),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final responseData = data['data'];
+          
+          // Check if person exists
+          if (responseData['person'] != null) {
+            final personType = responseData['personType'] ?? 'citizen';
+            if (personType == 'passport') {
+              return {
+                'type': 'passport',
+                'data': PassportHolder.fromJson(responseData['person']),
+              };
+            } else {
+              return {
+                'type': 'citizen',
+                'data': RwandanCitizen.fromJson(responseData['person']),
+              };
+            }
+          }
         }
+        return null;
+      } else if (response.statusCode == 404) {
+        return null;
       } else {
-        // Search Rwandan citizens first for 16-digit IDs
-        final citizen = await searchRwandanCitizen(idNumber);
-        if (citizen != null) {
-          return {
-            'type': 'citizen',
-            'data': citizen,
-          };
-        }
+        throw Exception('Search failed: ${response.body}');
       }
-      
-      return null;
     } catch (e) {
       throw Exception('Network error: $e');
     }
@@ -846,6 +942,238 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Network error: $e');
+    }
+  }
+
+  // Get notifications (admin)
+  static Future<Map<String, dynamic>> getNotificationsAdmin() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(_url('/notifications')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to get notifications: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting notifications: $e');
+    }
+  }
+
+  // Create notification
+  static Future<Map<String, dynamic>> createNotification(Map<String, dynamic> notificationData) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse(_url('/notifications')),
+        headers: headers,
+        body: jsonEncode(notificationData),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to create notification: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error creating notification: $e');
+    }
+  }
+
+  // Update notification
+  static Future<Map<String, dynamic>> updateNotification(int notificationId, Map<String, dynamic> notificationData) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(
+        Uri.parse(_url('/notifications/$notificationId')),
+        headers: headers,
+        body: jsonEncode(notificationData),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to update notification: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating notification: $e');
+    }
+  }
+
+  // Delete notification (admin)
+  static Future<Map<String, dynamic>> deleteNotificationAdmin(int notificationId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.delete(
+        Uri.parse(_url('/notifications/$notificationId')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to delete notification: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error deleting notification: $e');
+    }
+  }
+
+  // Get users (admin)
+  static Future<Map<String, dynamic>> getUsersAdmin() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(_url('/users')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to get users: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting users: $e');
+    }
+  }
+
+  // Create user
+  static Future<Map<String, dynamic>> createUser(Map<String, dynamic> userData) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse(_url('/users')),
+        headers: headers,
+        body: jsonEncode(userData),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to create user: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error creating user: $e');
+    }
+  }
+
+  // Update user
+  static Future<Map<String, dynamic>> updateUser(int userId, Map<String, dynamic> userData) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(
+        Uri.parse(_url('/users/$userId')),
+        headers: headers,
+        body: jsonEncode(userData),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to update user: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating user: $e');
+    }
+  }
+
+  // Delete user (admin)
+  static Future<Map<String, dynamic>> deleteUserAdmin(int userId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.delete(
+        Uri.parse(_url('/users/$userId')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to delete user: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error deleting user: $e');
+    }
+  }
+
+  // Get criminal records statistics
+  static Future<Map<String, dynamic>> getCriminalRecordsStatistics() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(_url('/criminal-records/statistics')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to get criminal records statistics: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting criminal records statistics: $e');
+    }
+  }
+
+  // Get victims statistics
+  static Future<Map<String, dynamic>> getVictimsStatistics() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(_url('/victims/statistics')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to get victims statistics: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting victims statistics: $e');
+    }
+  }
+
+  // Get notifications statistics
+  static Future<Map<String, dynamic>> getNotificationsStatistics() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(_url('/notifications/stats/rib-statistics')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to get notifications statistics: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting notifications statistics: $e');
+    }
+  }
+
+  // Get arrested criminals statistics
+  static Future<Map<String, dynamic>> getArrestedCriminalsStatistics() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(_url('/arrested/statistics')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to get arrested criminals statistics: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error getting arrested criminals statistics: $e');
     }
   }
 }

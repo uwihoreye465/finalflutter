@@ -3,6 +3,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import '../../services/api_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/loading_widget.dart';
@@ -123,12 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   CustomTextField(
                     controller: _sectorController,
                     hintText: 'Enter Sector',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter sector';
-                      }
-                      return null;
-                    },
+                    validator: Validators.validateRequired,
                   ),
                   
                   const SizedBox(height: 15),
@@ -137,12 +133,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   CustomTextField(
                     controller: _fullnameController,
                     hintText: 'Enter Fullname',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter full name';
-                      }
-                      return null;
-                    },
+                    validator: Validators.validateRequired,
                   ),
                   
                   const SizedBox(height: 15),
@@ -151,12 +142,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   CustomTextField(
                     controller: _positionController,
                     hintText: 'Enter Position',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter position';
-                      }
-                      return null;
-                    },
+                    validator: Validators.validateRequired,
                   ),
                   
                   const SizedBox(height: 15),
@@ -166,15 +152,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _emailController,
                     hintText: 'Enter your Email',
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter email';
-                      }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                        return 'Please enter valid email';
-                      }
-                      return null;
-                    },
+                    validator: Validators.validateEmail,
                   ),
                   
                   const SizedBox(height: 15),
@@ -195,15 +173,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         });
                       },
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter password';
-                      }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-                      return null;
-                    },
+                    validator: Validators.validateStrongPassword,
                   ),
                   
                   const SizedBox(height: 30),

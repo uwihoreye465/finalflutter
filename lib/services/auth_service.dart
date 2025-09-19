@@ -45,7 +45,24 @@ class AuthService with ChangeNotifier {
       debugPrint('Auth service received response: $response');
       
       if (response['success'] == true || response['token'] != null) {
-        _user = User.fromJson(response['user'] ?? response);
+        // Handle different response structures
+        if (response['user'] != null) {
+          _user = User.fromJson(response['user']);
+        } else if (response['data'] != null) {
+          _user = User.fromJson(response['data']);
+        } else {
+          // If no user object, create one from available data
+          _user = User(
+            userId: response['user_id'] ?? 0,
+            fullname: response['fullname'] ?? 'User',
+            email: email,
+            role: response['role'] ?? 'user',
+            sector: response['sector'] ?? '',
+            position: response['position'] ?? '',
+            isVerified: response['is_verified'] ?? false,
+          );
+        }
+        
         _token = response['token'];
         _isAuthenticated = true;
         
@@ -56,11 +73,12 @@ class AuthService with ChangeNotifier {
         
         notifyListeners();
       } else {
-        throw Exception(response['message'] ?? 'Login failed');
+        throw Exception(response['message'] ?? 'Login failed: Invalid credentials');
       }
     } catch (e) {
       debugPrint('Auth service error: $e');
-      throw Exception('Login error: ${e.toString()}');
+      // Re-throw the original exception to preserve the specific error message
+      rethrow;
     }
   }
 
@@ -79,17 +97,11 @@ class AuthService with ChangeNotifier {
     }
   }
 
-  Future<void> logout() async {
+  static Future<void> logout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user');
       await prefs.remove('token');
-      
-      _user = null;
-      _token = null;
-      _isAuthenticated = false;
-      
-      notifyListeners();
     } catch (e) {
       debugPrint('Error during logout: $e');
     }

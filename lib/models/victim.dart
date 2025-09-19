@@ -20,7 +20,7 @@ class Victim {
   final String? maritalStatus;
   final String? sinnerIdentification;
   final String crimeType;
-  final String? evidence;
+  final Map<String, dynamic>? evidence;
   final DateTime? dateCommitted;
   final int? criminalId;
   final DateTime? createdAt;
@@ -80,7 +80,7 @@ class Victim {
       maritalStatus: json['marital_status'],
       sinnerIdentification: json['sinner_identification'],
       crimeType: json['crime_type'] ?? '',
-      evidence: json['evidence'],
+      evidence: json['evidence'] != null ? Map<String, dynamic>.from(json['evidence']) : null,
       dateCommitted: json['date_committed'] != null 
           ? DateTime.parse(json['date_committed']) 
           : null,

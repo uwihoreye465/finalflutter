@@ -17,7 +17,8 @@ class _NewsScreenState extends State<NewsScreen> {
   bool _isLoading = true;
   int _currentPage = 1;
   bool _hasMoreData = true;
-  final int _itemsPerPage = 10;
+  final int _itemsPerPage = 4; // 4 items per page for 2x2 grid
+  int _totalPages = 1;
 
   @override
   void initState() {
@@ -41,27 +42,55 @@ class _NewsScreenState extends State<NewsScreen> {
         limit: _itemsPerPage,
       );
 
-      if (response['success'] == true && response['data'] != null) {
-        final List<ArrestedCriminal> newCriminals = (response['data'] as List)
-            .map((json) => ArrestedCriminal.fromJson(json))
-            .toList();
+      debugPrint('Arrested criminals API response: $response');
 
-        setState(() {
-          if (refresh) {
-            _arrestedCriminals = newCriminals;
-          } else {
-            _arrestedCriminals.addAll(newCriminals);
-          }
-          _hasMoreData = newCriminals.length == _itemsPerPage;
-          _currentPage++;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
-        debugPrint('No data received from API');
+      List<ArrestedCriminal> newCriminals = [];
+      
+      // Handle the actual API response structure
+      if (response['success'] == true && response['data'] != null) {
+        final dataMap = response['data'] as Map<String, dynamic>;
+        
+        // The API returns data in data.records structure
+        if (dataMap['records'] != null && dataMap['records'] is List) {
+          final records = dataMap['records'] as List;
+          newCriminals = records.map((record) {
+            // Extract only essential fields for news display
+            return ArrestedCriminal(
+              arrestId: record['arrest_id'] ?? 0,
+              fullname: record['fullname'] ?? 'Unknown',
+              imageUrl: record['image_url'],
+              crimeType: record['crime_type'] ?? 'Unknown Crime',
+              dateArrested: record['date_arrested'] != null 
+                  ? DateTime.parse(record['date_arrested'])
+                  : DateTime.now(),
+              arrestLocation: record['arrest_location'],
+              idType: record['id_type'],
+              idNumber: record['id_number'],
+              criminalRecordId: record['criminal_record_id'],
+              arrestingOfficerId: record['arresting_officer_id'],
+            );
+          }).toList();
+        }
       }
+
+      // Get pagination info from response
+      final pagination = response['data']['pagination'];
+      if (pagination != null) {
+        _totalPages = pagination['totalPages'] ?? 1;
+      }
+
+      setState(() {
+        if (refresh) {
+          _arrestedCriminals = newCriminals;
+        } else {
+          _arrestedCriminals.addAll(newCriminals);
+        }
+        _hasMoreData = _currentPage < _totalPages;
+        _currentPage++;
+        _isLoading = false;
+      });
+
+      debugPrint('Loaded ${newCriminals.length} arrested criminals (Page $_currentPage of $_totalPages)');
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -77,6 +106,24 @@ class _NewsScreenState extends State<NewsScreen> {
           ),
         );
       }
+    }
+  }
+
+  void _goToNextPage() {
+    if (_hasMoreData) {
+      _loadArrestedCriminals();
+    }
+  }
+
+  void _goToPreviousPage() {
+    if (_currentPage > 1) {
+      setState(() {
+        _currentPage = _currentPage - 1;
+        _arrestedCriminals = [];
+        _hasMoreData = true;
+        _isLoading = true;
+      });
+      _loadArrestedCriminals();
     }
   }
 
@@ -151,27 +198,65 @@ class _NewsScreenState extends State<NewsScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: () => _loadArrestedCriminals(refresh: true),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _arrestedCriminals.length + (_hasMoreData ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == _arrestedCriminals.length) {
-                              // Load more indicator
-                              if (_hasMoreData) {
-                                _loadArrestedCriminals();
-                                return const Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(16),
-                                    child: LoadingWidget(),
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            }
-
-                            final criminal = _arrestedCriminals[index];
-                            return _buildNewsCard(criminal);
-                          },
+                        child: Column(
+                          children: [
+                            // 2x2 Grid Layout
+                            Expanded(
+                              child: GridView.builder(
+                                padding: const EdgeInsets.all(16),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  childAspectRatio: 0.8,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                ),
+                                itemCount: _arrestedCriminals.length,
+                                itemBuilder: (context, index) {
+                                  final criminal = _arrestedCriminals[index];
+                                  return _buildNewsCard(criminal);
+                                },
+                              ),
+                            ),
+                            
+                            // Pagination Controls
+                            if (_totalPages > 1)
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    // Previous Page Button
+                                    ElevatedButton(
+                                      onPressed: _currentPage > 1 ? _goToPreviousPage : null,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primaryColor,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('Previous'),
+                                    ),
+                                    
+                                    // Page Info
+                                    Text(
+                                      'Page $_currentPage of $_totalPages',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    
+                                    // Next Page Button
+                                    ElevatedButton(
+                                      onPressed: _hasMoreData ? _goToNextPage : null,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primaryColor,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('Next'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                       ),
           ),
@@ -182,55 +267,55 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Widget _buildNewsCard(ArrestedCriminal criminal) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
         border: Border.all(color: Colors.red.withOpacity(0.2), width: 1),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header with alert badge
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.red.withOpacity(0.1),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
               ),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.red,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
                     'ARRESTED',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 12,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 const Spacer(),
                 Text(
-                  DateFormat('MMM dd, yyyy').format(criminal.dateArrested),
+                  DateFormat('MMM dd').format(criminal.dateArrested),
                   style: TextStyle(
                     color: Colors.grey[600],
-                    fontSize: 14,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -238,91 +323,76 @@ class _NewsScreenState extends State<NewsScreen> {
           ),
           
           // Content
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Photo placeholder or actual image
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[400]!),
-                  ),
-                  child: criminal.imageUrl != null && criminal.imageUrl!.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            criminal.imageUrl!,
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildPhotoPlaceholder();
-                            },
-                          ),
-                        )
-                      : _buildPhotoPlaceholder(),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // Criminal details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        criminal.fullname,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      _buildDetailRow('Crime', criminal.crimeType),
-                      
-                      if (criminal.idNumber != null)
-                        _buildDetailRow('ID', criminal.idNumber!),
-                      
-                      if (criminal.arrestLocation != null)
-                        _buildDetailRow('Location', criminal.arrestLocation!),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Warning footer
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'This person has been arrested and charged. If you have any information related to this case, please contact RIB.',
-                    style: TextStyle(
-                      color: Colors.orange[700],
-                      fontSize: 12,
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  // Photo placeholder or actual image
+                  Container(
+                    width: double.infinity,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[400]!),
                     ),
+                    child: criminal.imageUrl != null && criminal.imageUrl!.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              criminal.imageUrl!,
+                              width: double.infinity,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildPhotoPlaceholder();
+                              },
+                            ),
+                          )
+                        : _buildPhotoPlaceholder(),
                   ),
-                ),
-              ],
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Criminal details
+                  Text(
+                    criminal.fullname,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  
+                  Text(
+                    criminal.crimeType,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  if (criminal.arrestLocation != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      criminal.arrestLocation!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ],
@@ -332,11 +402,11 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Widget _buildPhotoPlaceholder() {
     return Container(
-      width: 80,
+      width: double.infinity,
       height: 80,
       decoration: BoxDecoration(
         color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

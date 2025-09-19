@@ -12,15 +12,17 @@ import '../../utils/constants.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
+import '../../services/auth_service.dart';
+import '../../screens/auth/login_screen.dart';
 
-class UnifiedReportScreen extends StatefulWidget {
-  const UnifiedReportScreen({super.key});
+class EnhancedReportScreen extends StatefulWidget {
+  const EnhancedReportScreen({super.key});
 
   @override
-  State<UnifiedReportScreen> createState() => _UnifiedReportScreenState();
+  State<EnhancedReportScreen> createState() => _EnhancedReportScreenState();
 }
 
-class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTickerProviderStateMixin {
+class _EnhancedReportScreenState extends State<EnhancedReportScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   
   // Form keys
@@ -31,19 +33,25 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
   final _idNumberController = TextEditingController();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _countryController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _addressNowController = TextEditingController();
+  
+  // Citizen-specific controllers
   final _provinceController = TextEditingController();
   final _districtController = TextEditingController();
   final _sectorController = TextEditingController();
   final _cellController = TextEditingController();
   final _villageController = TextEditingController();
-  final _addressNowController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
+  
+  // Passport-specific controllers
+  final _countryController = TextEditingController();
+  final _nationalityController = TextEditingController();
+  final _homeAddressController = TextEditingController();
   
   // Victim-specific controllers
   final _sinnerIdController = TextEditingController();
-  final _evidenceController = TextEditingController();
+  final _evidenceDescriptionController = TextEditingController();
   
   // Criminal-specific controllers
   final _descriptionController = TextEditingController();
@@ -58,6 +66,8 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
   
   bool _isAutofilledData = false;
   bool _isSubmitting = false;
+  String? _nidaMessage;
+  String? _nidaMessageType; // 'success', 'warning', 'error'
   
   // Auto-filled data references
   RwandanCitizen? _autofilledCitizen;
@@ -69,23 +79,53 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
     _tabController = TabController(length: 2, vsync: this);
   }
 
+  Future<void> _logout() async {
+    try {
+      await AuthService.logout();
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+        Fluttertoast.showToast(
+          msg: 'Logged out successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Error logging out: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
     _idNumberController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
-    _countryController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    _addressNowController.dispose();
     _provinceController.dispose();
     _districtController.dispose();
     _sectorController.dispose();
     _cellController.dispose();
     _villageController.dispose();
-    _addressNowController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
+    _countryController.dispose();
+    _nationalityController.dispose();
+    _homeAddressController.dispose();
     _sinnerIdController.dispose();
-    _evidenceController.dispose();
+    _evidenceDescriptionController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -99,6 +139,8 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
       if (personData != null) {
         setState(() {
           _isAutofilledData = true;
+          _nidaMessage = 'Data auto-filled from NIDA records';
+          _nidaMessageType = 'success';
           
           if (personData['type'] == 'citizen') {
             final citizen = personData['data'] as RwandanCitizen;
@@ -130,7 +172,9 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
             _selectedDateOfBirth = passportHolder.dateOfBirth;
             _selectedMaritalStatus = passportHolder.maritalStatus;
             _countryController.text = passportHolder.nationality ?? '';
+            _nationalityController.text = passportHolder.nationality ?? '';
             _addressNowController.text = passportHolder.addressInRwanda ?? '';
+            _homeAddressController.text = passportHolder.homeAddress ?? '';
             _phoneController.text = passportHolder.phone ?? '';
             _emailController.text = passportHolder.email ?? '';
             _selectedIdType = 'passport';
@@ -152,7 +196,7 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
         });
         
         Fluttertoast.showToast(
-          msg: 'Uyu muntu ntabwo yanditswe muri NIDA. Uzuza amakuru yose wenyine.',
+          msg: 'Nta mwirondoro wanyu wanditse muri NIDA. Uzuza amakuru yose wenyine.',
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.warningColor,
@@ -206,19 +250,23 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
         lastName: _lastNameController.text.trim(),
         gender: _selectedGender!,
         dateOfBirth: _selectedDateOfBirth,
-        province: _provinceController.text.trim().isEmpty ? null : _provinceController.text.trim(),
-        district: _districtController.text.trim().isEmpty ? null : _districtController.text.trim(),
-        sector: _sectorController.text.trim().isEmpty ? null : _sectorController.text.trim(),
-        cell: _cellController.text.trim().isEmpty ? null : _cellController.text.trim(),
-        village: _villageController.text.trim().isEmpty ? null : _villageController.text.trim(),
-        country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
+        province: _selectedIdType == 'passport' ? null : (_provinceController.text.trim().isEmpty ? null : _provinceController.text.trim()),
+        district: _selectedIdType == 'passport' ? null : (_districtController.text.trim().isEmpty ? null : _districtController.text.trim()),
+        sector: _selectedIdType == 'passport' ? null : (_sectorController.text.trim().isEmpty ? null : _sectorController.text.trim()),
+        cell: _selectedIdType == 'passport' ? null : (_cellController.text.trim().isEmpty ? null : _cellController.text.trim()),
+        village: _selectedIdType == 'passport' ? null : (_villageController.text.trim().isEmpty ? null : _villageController.text.trim()),
+        country: _selectedIdType == 'passport' ? (_countryController.text.trim().isEmpty ? null : _countryController.text.trim()) : null,
         addressNow: _addressNowController.text.trim().isEmpty ? null : _addressNowController.text.trim(),
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         victimEmail: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         maritalStatus: _selectedMaritalStatus,
         sinnerIdentification: _sinnerIdController.text.trim().isEmpty ? null : _sinnerIdController.text.trim(),
         crimeType: _selectedCrimeType!,
-        evidence: _evidenceController.text.trim().isEmpty ? null : _evidenceController.text.trim(),
+        evidence: _evidenceDescriptionController.text.trim().isEmpty ? null : {
+          'description': _evidenceDescriptionController.text.trim(),
+          'files': [],
+          'uploadedAt': DateTime.now().toIso8601String(),
+        },
         dateCommitted: _selectedDateCommitted,
       );
 
@@ -263,12 +311,12 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
         gender: _selectedGender!,
         dateOfBirth: _selectedDateOfBirth,
         maritalStatus: _selectedMaritalStatus,
-        country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
-        province: _provinceController.text.trim().isEmpty ? null : _provinceController.text.trim(),
-        district: _districtController.text.trim().isEmpty ? null : _districtController.text.trim(),
-        sector: _sectorController.text.trim().isEmpty ? null : _sectorController.text.trim(),
-        cell: _cellController.text.trim().isEmpty ? null : _cellController.text.trim(),
-        village: _villageController.text.trim().isEmpty ? null : _villageController.text.trim(),
+        country: _selectedIdType == 'passport' ? (_countryController.text.trim().isEmpty ? null : _countryController.text.trim()) : null,
+        province: _selectedIdType == 'passport' ? null : (_provinceController.text.trim().isEmpty ? null : _provinceController.text.trim()),
+        district: _selectedIdType == 'passport' ? null : (_districtController.text.trim().isEmpty ? null : _districtController.text.trim()),
+        sector: _selectedIdType == 'passport' ? null : (_sectorController.text.trim().isEmpty ? null : _sectorController.text.trim()),
+        cell: _selectedIdType == 'passport' ? null : (_cellController.text.trim().isEmpty ? null : _cellController.text.trim()),
+        village: _selectedIdType == 'passport' ? null : (_villageController.text.trim().isEmpty ? null : _villageController.text.trim()),
         addressNow: _addressNowController.text.trim().isEmpty ? null : _addressNowController.text.trim(),
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         crimeType: _selectedCrimeType!,
@@ -306,17 +354,19 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
     _idNumberController.clear();
     _firstNameController.clear();
     _lastNameController.clear();
-    _countryController.clear();
+    _phoneController.clear();
+    _emailController.clear();
+    _addressNowController.clear();
     _provinceController.clear();
     _districtController.clear();
     _sectorController.clear();
     _cellController.clear();
     _villageController.clear();
-    _addressNowController.clear();
-    _phoneController.clear();
-    _emailController.clear();
+    _countryController.clear();
+    _nationalityController.clear();
+    _homeAddressController.clear();
     _sinnerIdController.clear();
-    _evidenceController.clear();
+    _evidenceDescriptionController.clear();
     _descriptionController.clear();
     
     setState(() {
@@ -340,6 +390,13 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
         title: const Text('Report Crime', style: TextStyle(color: Colors.white)),
         backgroundColor: AppColors.primaryColor,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Logout',
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -426,7 +483,7 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
             
             // Evidence
             CustomTextField(
-              controller: _evidenceController,
+              controller: _evidenceDescriptionController,
               hintText: 'Describe the evidence...',
               label: 'Evidence',
               maxLines: 3,
@@ -719,13 +776,30 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
       const SizedBox(height: 16),
       
       if (_selectedIdType == 'passport') ...[
+        // Passport holder fields
         CustomTextField(
           controller: _countryController,
           hintText: 'Enter Country',
           label: 'Country',
         ),
         const SizedBox(height: 16),
+        
+        CustomTextField(
+          controller: _nationalityController,
+          hintText: 'Enter Nationality',
+          label: 'Nationality',
+        ),
+        const SizedBox(height: 16),
+        
+        CustomTextField(
+          controller: _homeAddressController,
+          hintText: 'Enter Home Address',
+          label: 'Home Address',
+          maxLines: 2,
+        ),
+        const SizedBox(height: 16),
       ] else ...[
+        // Citizen fields
         DropdownSearch<String>(
           items: AppConstants.provinces,
           dropdownDecoratorProps: const DropDownDecoratorProps(
@@ -792,6 +866,15 @@ class _UnifiedReportScreenState extends State<UnifiedReportScreen> with SingleTi
         controller: _emailController,
         hintText: 'Enter Email Address',
         label: 'Email Address',
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter email address';
+          }
+          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+            return 'Please enter a valid email address';
+          }
+          return null;
+        },
       ),
       
       const SizedBox(height: 16),

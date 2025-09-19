@@ -133,7 +133,7 @@ class _ManageVictimsScreenState extends State<ManageVictimsScreen> {
                   if (victim.sinnerIdentification != null)
                     _buildDetailItem('Suspect Info', victim.sinnerIdentification!),
                   if (victim.evidence != null)
-                    _buildDetailItem('Evidence', victim.evidence!),
+                    _buildDetailItem('Evidence', victim.evidence!['description'] ?? 'No description'),
                   if (victim.dateCommitted != null)
                     _buildDetailItem('Date Committed', DateFormat('yyyy-MM-dd').format(victim.dateCommitted!)),
                   if (victim.createdAt != null)

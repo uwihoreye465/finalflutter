@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../../services/api_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/loading_widget.dart';
@@ -119,16 +120,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 controller: _emailController,
                 hintText: 'Enter your email',
                 keyboardType: TextInputType.emailAddress,
-                prefixIcon: Icons.email,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                    return 'Please enter a valid email';
-                  }
-                  return null;
-                },
+                prefixIcon: const Icon(Icons.email),
+                validator: Validators.validateEmail,
               ),
               
               const SizedBox(height: 30),

@@ -1,226 +1,250 @@
-# Criminal Tracking System - Mobile App
+# Criminal Tracking System
 
-A comprehensive Flutter mobile application for tracking criminal records and managing crime reports in Rwanda.
+A comprehensive Flutter application for tracking criminal records, victims, and notifications in Rwanda. The system integrates with NIDA (National Identification Agency) for automatic data population and provides administrative management capabilities.
 
-## 🚀 Features
+## Features
 
-### **Public Features**
-- **Criminal Search**: Search for criminals by ID number or passport
-- **News Section**: View arrested criminals with photos and details
-- **Multilingual Support**: Kinyarwanda and English messages
+### 🔍 **Criminal Search & Tracking**
+- Search criminals by ID number (National ID or Passport)
+- Automatic data population from NIDA records
+- Real-time criminal record verification
+- Clean record confirmation for law-abiding citizens
 
-### **User Features (Login Required)**
-- **Unified Reporting**: Report both victims and criminals in one interface
-- **NIDA Integration**: Auto-fill personal data from national database
-- **Photo Upload**: Add criminal photos with arrest records
-- **Notification System**: Send alerts to RIB for criminal sightings
+### 📝 **Crime Reporting**
+- **Victim Reporting**: Report crime victims with detailed information
+- **Criminal Reporting**: Report criminal activities with evidence
+- **Separate Forms**: Different forms for passport holders vs citizens
+- **Auto-fill**: Automatic population of personal data from NIDA
+- **Evidence Management**: Support for evidence files and descriptions
 
-### **Admin Features**
-- **Dashboard**: Comprehensive statistics and crime data visualization
-- **Criminal Records Management**: Full CRUD operations
-- **Victim Reports Management**: Manage and track victim reports
-- **Arrested Criminals**: Register arrests and publish to news
-- **User Management**: Approve users and manage permissions
-- **Notification Management**: Process criminal sighting alerts
+### 👮 **Admin Management**
+- **Comprehensive Dashboard**: Overview of all system statistics
+- **CRUD Operations**: Full Create, Read, Update, Delete for all entities
+- **User Management**: Approve/reject user registrations
+- **Notification Management**: View and manage notifications with GPS locations
+- **Statistics & Analytics**: Detailed charts and reports
 
-## 🏗️ Architecture
+### 📊 **Statistics & Analytics**
+- **Crime Type Distribution**: Pie charts showing crime categories
+- **Geographic Analysis**: Province and district-wise crime distribution
+- **Monthly Trends**: Time-based crime analysis
+- **Arrest Statistics**: Arrest data and officer performance
+- **Notification Analytics**: RIB statistics and message tracking
 
-### **Database Schema**
-The app integrates with PostgreSQL database with the following tables:
-- `rwandan_citizen` - NIDA citizen data
-- `passport_holder` - Foreign passport holders
-- `criminal_record` - Criminal records
-- `victim` - Victim reports
-- `criminals_arrested` - Arrested criminals for news
-- `notification` - Alert notifications
-- `users` - System users
+### 🔔 **Notification System**
+- **GPS Location Tracking**: View notification locations on maps
+- **RIB Management**: Track messages by RIB office
+- **Real-time Updates**: Live notification status
+- **Filter & Search**: Advanced filtering capabilities
 
-### **API Integration**
-Base URL: `https://tracking-criminal.onrender.com/api/v1`
+## API Integration
 
-#### **Criminal Records**
-- `GET /criminal-records/search/:idNumber` - Search person by ID
-- `GET /criminal-records` - Get all criminal records (paginated)
-- `POST /criminal-records` - Add criminal record
-- `PUT /criminal-records/:id` - Update criminal record
-- `DELETE /criminal-records/:id` - Delete criminal record
-- `GET /criminal-records/recent` - Get recent records
-- `GET /criminal-records/statistics` - Get crime statistics
+The application integrates with the following API endpoints:
 
-#### **Victims**
-- `POST /victims` - Add victim record
-- `GET /victims` - Get all victims (paginated)
-- `GET /victims/:id` - Get victim by ID
-- `PUT /victims/:id` - Update victim record
-- `DELETE /victims/:id` - Delete victim record
-- `GET /victims/recent` - Get recent victims
-- `GET /victims/statistics` - Get victim statistics
+### Criminal Records
+- `GET /api/v1/criminal-records/search/:idNumber` - Search person by ID
+- `GET /api/v1/criminal-records` - Get all criminal records (paginated)
+- `POST /api/v1/criminal-records` - Add criminal record
+- `GET /api/v1/criminal-records/statistics` - Get criminal statistics
 
-#### **Notifications**
-- `POST /notifications` - Send notification
-- `GET /notifications` - Get all notifications (paginated)
-- `GET /notifications/:id` - Get notification by ID
-- `DELETE /notifications/:id` - Delete notification
-- `GET /notifications/stats/rib-statistics` - Get notification stats
+### Victims
+- `POST /api/v1/victims` - Add victim record
+- `GET /api/v1/victims` - Get all victims (paginated)
+- `GET /api/v1/victims/statistics` - Get victim statistics
 
-#### **User Management**
-- `GET /users` - Get all users
-- `GET /users/pending` - Get pending approvals
-- `PUT /users/:id/approval` - Approve/reject user
-- `DELETE /users/:id` - Delete user
-- `GET /auth/verify-email/:token` - Verify email
-- `POST /auth/forgot-password` - Reset password
-- `POST /auth/change-password` - Change password
+### Arrested Criminals
+- `POST /api/v1/arrested` - Add arrested criminal
+- `GET /api/v1/arrested` - Get all arrested criminals
+- `GET /api/v1/arrested/statistics` - Get arrest statistics
 
-#### **Arrested Criminals**
-- `POST /arrested` - Add arrested criminal
-- `GET /arrested` - Get all arrested criminals
-- `PUT /arrested/:id` - Update arrested criminal
-- `DELETE /arrested/:id` - Delete arrested criminal
-- `GET /arrested/statistics` - Get arrest statistics
+### Notifications
+- `POST /api/v1/notifications` - Send notification
+- `GET /api/v1/notifications` - Get all notifications
+- `GET /api/v1/notifications/stats/rib-statistics` - Get RIB statistics
 
-## 📱 App Workflow
+## ID Type Support
 
-### **Step 1: Home Screen**
-- Shows search bar, login button, and news section
-- Users can search for criminals without login
-- Public access to news and alerts
+The system supports multiple ID types:
 
-### **Step 2: Authentication**
-- Users and admins can login
-- Role-based access control
-- Email verification system
+### Rwandan Citizens
+- `indangamuntu_yumunyarwanda` - National ID for Rwandan citizens
+- `indangamuntu_yumunyamahanga` - National ID for foreign residents
+- `indangampunzi` - Refugee ID
 
-### **Step 3: Crime Reporting (Logged-in Users)**
-- Select report type: Victim or Criminal
-- Enter ID number for auto-fill from NIDA
-- Supports multiple ID types:
-  - `indangamuntu_yumunyarwanda` (Rwandan National ID)
-  - `indangamuntu_yumunyamahanga` (Foreign National ID)
-  - `indangampunzi` (Refugee ID)
-  - `passport` (Passport)
+### Foreign Nationals
+- `passport` - International passport holders
 
-### **Step 4: Auto-fill Process**
-- System searches `rwandan_citizen` and `passport_holder` tables
-- If found: Auto-fills personal information
-- If not found: Shows "Not registered in NIDA" message
-- User completes remaining crime-specific details
+## Data Structure
 
-### **Step 5: Search Results**
-- **Criminal Found**: Shows "WAHUNZE UBUTABERA" (committed crime)
-- **Clean Record**: Shows "Uri umwere ntago wahunze ubutabera" (no crimes)
-- Option to send alert notification to RIB
-
-### **Step 6: Admin Notification Processing**
-- Admin receives alerts in enhanced notification screen
-- Can call reporter directly
-- Register arrests from notifications
-- Convert notifications to arrested criminal records
-
-### **Step 7: News Publication**
-- Arrested criminals automatically appear in news section
-- Includes photos, full names, and crime types
-- Public viewing for crime awareness
-
-## 🛠️ Technical Stack
-
-### **Frontend**
-- **Flutter 3.0+** - Cross-platform mobile development
-- **Dart** - Programming language
-- **Material Design** - UI components
-
-### **Key Dependencies**
-```yaml
-dependencies:
-  flutter:
-    sdk: flutter
-  http: ^1.1.0
-  shared_preferences: ^2.2.2
-  flutter_secure_storage: ^9.0.0
-  intl: ^0.18.1
-  provider: ^6.1.1
-  fluttertoast: ^8.2.4
-  dropdown_search: ^5.0.6
-  image_picker: ^1.0.4
-  url_launcher: ^6.2.1
-  fl_chart: ^0.66.0
-  flutter_local_notifications: ^16.3.0
-```
-
-### **State Management**
-- **Provider** - For authentication and data management
-- **StatefulWidget** - For local component state
-
-### **Data Storage**
-- **SharedPreferences** - User session and settings
-- **Flutter Secure Storage** - Authentication tokens
-
-## 🚦 Getting Started
-
-### **Prerequisites**
-- Flutter SDK 3.0 or higher
-- Dart SDK
-- Android Studio / VS Code
-- Chrome browser (for web testing)
-
-### **Installation**
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   flutter pub get
-   ```
-3. Run the app:
-   ```bash
-   flutter run -d chrome  # For web
-   flutter run -d android # For Android
-   flutter run -d ios     # For iOS
-   ```
-
-### **Configuration**
-Update `lib/utils/constants.dart` with your API configuration:
-```dart
-class AppConstants {
-  static const String baseUrl = 'your-api-base-url';
-  static const String apiVersion = '/api/v1';
+### Criminal Record
+```json
+{
+  "id_type": "indangamuntu_yumunyarwanda",
+  "id_number": "1190000000000001",
+  "first_name": "John",
+  "last_name": "Doe",
+  "gender": "Male",
+  "date_of_birth": "1990-01-01",
+  "crime_type": "Theft",
+  "description": "Crime description",
+  "date_committed": "2024-01-01"
 }
 ```
 
-## 🔐 Security Features
+### Victim Record
+```json
+{
+  "id_type": "passport",
+  "id_number": "US123456789",
+  "first_name": "Jane",
+  "last_name": "Smith",
+  "victim_email": "jane@example.com",
+  "crime_type": "Assault",
+  "evidence": {
+    "description": "Evidence description",
+    "files": [],
+    "uploadedAt": "2024-01-01T12:00:00.000Z"
+  }
+}
+```
 
-- **JWT Authentication** - Secure token-based authentication
-- **Role-based Access** - Admin vs User permissions
-- **Input Validation** - Comprehensive data validation
-- **Secure Storage** - Encrypted local storage for sensitive data
+## Installation
 
-## 🌍 Localization
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd criminal_tracking_app
+   ```
 
-- **English** - Primary language
-- **Kinyarwanda** - Local language support for key messages
-- Crime status messages in both languages
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
 
-## 📊 Analytics & Reporting
+3. **Configure API endpoint**
+   - Update `lib/utils/constants.dart` with your API base URL
+   - Current default: `https://tracking-criminal.onrender.com`
 
-- **Crime Statistics** - Visual charts and graphs
-- **Geographic Data** - Province and district-based analytics
-- **Time-based Reports** - Trend analysis
-- **User Activity** - Registration and usage statistics
+4. **Run the application**
+   ```bash
+   flutter run
+   ```
 
-## 🤝 Contributing
+## Dependencies
+
+- `flutter`: SDK
+- `http`: HTTP client for API calls
+- `shared_preferences`: Local storage
+- `flutter_secure_storage`: Secure storage
+- `fl_chart`: Charts and graphs
+- `intl`: Internationalization
+- `provider`: State management
+- `fluttertoast`: Toast notifications
+- `dropdown_search`: Enhanced dropdowns
+- `url_launcher`: Open external URLs
+- `image_picker`: Image selection
+
+## Project Structure
+
+```
+lib/
+├── config/
+│   └── firebase_config.dart
+├── models/
+│   ├── arrested_criminal.dart
+│   ├── criminal_record.dart
+│   ├── notification.dart
+│   ├── passport_holder.dart
+│   ├── rwandan_citizen.dart
+│   ├── user.dart
+│   └── victim.dart
+├── screens/
+│   ├── admin/
+│   │   ├── enhanced_admin_dashboard.dart
+│   │   ├── enhanced_notifications_screen.dart
+│   │   ├── enhanced_statistics_screen.dart
+│   │   ├── manage_criminal_records_screen.dart
+│   │   ├── manage_victims_screen.dart
+│   │   ├── manage_arrested_criminals_screen.dart
+│   │   └── manage_users_screen.dart
+│   ├── auth/
+│   │   ├── login_screen.dart
+│   │   └── register_screen.dart
+│   ├── home/
+│   │   └── home_screen.dart
+│   ├── user/
+│   │   └── enhanced_report_screen.dart
+│   └── search/
+│       └── search_result_screen.dart
+├── services/
+│   ├── api_service.dart
+│   ├── auth_service.dart
+│   ├── autofill_service.dart
+│   ├── notification_service.dart
+│   └── storage_service.dart
+├── utils/
+│   ├── constants.dart
+│   └── validators.dart
+├── widgets/
+│   ├── common_footer.dart
+│   ├── common_header.dart
+│   ├── custom_button.dart
+│   ├── custom_text_field.dart
+│   └── loading_widget.dart
+└── main.dart
+```
+
+## Key Features Implementation
+
+### 1. Auto-fill Functionality
+- Searches NIDA database using ID number
+- Automatically populates personal information
+- Supports both citizen and passport holder data
+- Handles different ID types appropriately
+
+### 2. Form Validation
+- Required field validation
+- Email format validation
+- ID number format validation
+- Evidence structure validation
+
+### 3. Admin Dashboard
+- Real-time statistics
+- Interactive charts and graphs
+- CRUD operations for all entities
+- Search and filter capabilities
+- GPS location display for notifications
+
+### 4. Security Features
+- User authentication and authorization
+- Role-based access control
+- Secure API communication
+- Data validation and sanitization
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
+4. Add tests if applicable
 5. Submit a pull request
 
-## 📄 License
+## License
 
-This project is developed for Rwanda Investigation Bureau (RIB) for criminal tracking and public safety purposes.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📞 Support
+## Support
 
-For technical support or questions about the Criminal Tracking System, please contact the development team.
+For support and questions, please contact the development team or create an issue in the repository.
 
----
+## Changelog
 
-**Rwanda Investigation Bureau - Criminal Tracking System** 🇷🇼
+### Version 1.0.0
+- Initial release
+- Criminal search and tracking
+- Crime reporting system
+- Admin management dashboard
+- Statistics and analytics
+- Notification system with GPS tracking
+- NIDA integration for auto-fill
+- Multi-ID type support

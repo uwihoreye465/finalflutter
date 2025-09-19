@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
+import '../../services/api_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/loading_widget.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 import '../home/home_screen.dart';
+import '../admin/admin_dashboard.dart';
+import '../user/enhanced_report_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -43,10 +48,20 @@ class _LoginScreenState extends State<LoginScreen> {
           textColor: Colors.white,
         );
         
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        // Navigate based on user role
+        final userRole = authService.user?.role?.toLowerCase();
+        if (userRole == 'admin') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminDashboard()),
+          );
+        } else {
+          // For staff or other roles, go to report screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const EnhancedReportScreen()),
+          );
+        }
       } else {
         Fluttertoast.showToast(
           msg: "Login failed: Invalid credentials",
@@ -58,12 +73,31 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       String errorMessage = "Login failed";
-      if (e.toString().contains('Network error')) {
+      String errorString = e.toString();
+      
+      if (errorString.contains('Network error')) {
         errorMessage = "Network error: Please check your internet connection";
-      } else if (e.toString().contains('Login failed')) {
+      } else if (errorString.contains('Unable to connect to server')) {
+        errorMessage = "Unable to connect to server. Please check your internet connection.";
+      } else if (errorString.contains('Please verify your email')) {
+        errorMessage = "Please verify your email before logging in. Check your email for verification link.";
+      } else if (errorString.contains('pending admin approval')) {
+        errorMessage = "Your account is pending admin approval. Please wait for approval.";
+      } else if (errorString.contains('Invalid email or password') || errorString.contains('401')) {
         errorMessage = "Invalid email or password";
-      } else if (e.toString().contains('Exception')) {
+      } else if (errorString.contains('Server error') || errorString.contains('500')) {
         errorMessage = "Server error: Please try again later";
+      } else if (errorString.contains('Request timeout')) {
+        errorMessage = "Request timeout: Please try again";
+      } else if (errorString.contains('Invalid input data') || errorString.contains('422')) {
+        errorMessage = "Invalid input data: Please check your email and password";
+      } else {
+        // Extract the actual error message from the exception
+        if (errorString.contains('Exception: ')) {
+          errorMessage = errorString.split('Exception: ')[1];
+        } else {
+          errorMessage = "Login failed: Please try again";
+        }
       }
       
       Fluttertoast.showToast(
@@ -99,7 +133,25 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 50),
+                  // Back button
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      ),
+                      const Text(
+                        'Login',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
                   
                   // User Icon
                   const Icon(
@@ -128,15 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _emailController,
                     hintText: 'Enter your email',
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter email';
-                      }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                        return 'Please enter valid email';
-                      }
-                      return null;
-                    },
+                    validator: Validators.validateEmail,
                   ),
                   
                   const SizedBox(height: 20),
@@ -160,9 +204,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter password';
-                      }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
                       }
                       return null;
                     },
@@ -202,11 +243,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Forgot Password
                   TextButton(
                     onPressed: () {
-                      // TODO: Implement forgot password
-                      Fluttertoast.showToast(
-                        msg: "Feature coming soon",
-                        backgroundColor: AppColors.primaryColor,
-                        textColor: Colors.white,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
                       );
                     },
                     child: const Text(

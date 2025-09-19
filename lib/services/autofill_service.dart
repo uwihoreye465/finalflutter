@@ -68,7 +68,7 @@ class AutofillService {
   static Victim autofillVictimFromCitizen(
     RwandanCitizen citizen, {
     String? crimeType,
-    String? evidence,
+    Map<String, dynamic>? evidence,
     DateTime? dateCommitted,
   }) {
     return Victim(

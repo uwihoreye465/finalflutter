@@ -72,7 +72,7 @@ class _ManageCriminalRecordsScreenState extends State<ManageCriminalRecordsScree
         idType: _selectedIdTypeFilter,
       );
 
-      final List<CriminalRecord> newRecords = (response['data'] as List)
+      final List<CriminalRecord> newRecords = ((response['data']['criminalRecords'] as List?) ?? (response['data'] as List))
           .map((json) => CriminalRecord.fromJson(json))
           .toList();
 
@@ -87,9 +87,11 @@ class _ManageCriminalRecordsScreenState extends State<ManageCriminalRecordsScree
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       _showErrorToast('Error loading criminal records: ${e.toString()}');
     }
   }

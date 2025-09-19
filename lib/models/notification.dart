@@ -5,6 +5,9 @@ class NotificationModel {
   final String address;
   final String phone;
   final String message;
+  final double? latitude;
+  final double? longitude;
+  final String? locationName;
   final DateTime? createdAt;
   final bool isRead;
 
@@ -15,6 +18,9 @@ class NotificationModel {
     required this.address,
     required this.phone,
     required this.message,
+    this.latitude,
+    this.longitude,
+    this.locationName,
     this.createdAt,
     this.isRead = false,
   });
@@ -27,6 +33,9 @@ class NotificationModel {
       address: json['address'] ?? '',
       phone: json['phone'] ?? '',
       message: json['message'] ?? '',
+      latitude: json['latitude']?.toDouble(),
+      longitude: json['longitude']?.toDouble(),
+      locationName: json['location_name'],
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at']) 
           : null,
@@ -42,6 +51,9 @@ class NotificationModel {
       'address': address,
       'phone': phone,
       'message': message,
+      'latitude': latitude,
+      'longitude': longitude,
+      'location_name': locationName,
       'created_at': createdAt?.toIso8601String(),
       'is_read': isRead,
     };

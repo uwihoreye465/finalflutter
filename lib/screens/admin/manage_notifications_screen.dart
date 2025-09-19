@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:dropdown_search/dropdown_search.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../models/notification.dart';
 import '../../utils/constants.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
+import '../../utils/validators.dart';
 
 class ManageNotificationsScreen extends StatefulWidget {
   const ManageNotificationsScreen({super.key});
@@ -18,19 +19,20 @@ class ManageNotificationsScreen extends StatefulWidget {
 class _ManageNotificationsScreenState extends State<ManageNotificationsScreen> {
   List<NotificationModel> _notifications = [];
   bool _isLoading = true;
-  int _currentPage = 1;
-  bool _hasMoreData = true;
-  final int _itemsPerPage = 10;
-  final TextEditingController _searchController = TextEditingController();
+  bool _isSubmitting = false;
 
-  // Send notification form controllers
+  // Form controllers
   final _formKey = GlobalKey<FormState>();
   final _nearRibController = TextEditingController();
   final _fullnameController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
   final _messageController = TextEditingController();
-  bool _isSubmitting = false;
+  final _latitudeController = TextEditingController();
+  final _longitudeController = TextEditingController();
+  final _locationNameController = TextEditingController();
+
+  NotificationModel? _editingNotification;
 
   @override
   void initState() {
@@ -38,45 +40,48 @@ class _ManageNotificationsScreenState extends State<ManageNotificationsScreen> {
     _loadNotifications();
   }
 
-  Future<void> _loadNotifications({bool refresh = false}) async {
-    if (refresh) {
-      setState(() {
-        _currentPage = 1;
-        _notifications = [];
-        _hasMoreData = true;
-        _isLoading = true;
-      });
-    }
-
-    try {
-      final response = await ApiService.getNotifications(
-        page: _currentPage,
-        limit: _itemsPerPage,
-      );
-
-      final List<NotificationModel> newNotifications = (response['data'] as List)
-          .map((json) => NotificationModel.fromJson(json))
-          .toList();
-
-      setState(() {
-        if (refresh) {
-          _notifications = newNotifications;
-        } else {
-          _notifications.addAll(newNotifications);
-        }
-        _hasMoreData = newNotifications.length == _itemsPerPage;
-        _currentPage++;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showErrorToast('Error loading notifications: ${e.toString()}');
-    }
+  @override
+  void dispose() {
+    _nearRibController.dispose();
+    _fullnameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    _messageController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    _locationNameController.dispose();
+    super.dispose();
   }
 
-  Future<void> _sendNotification() async {
+  Future<void> _loadNotifications() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await ApiService.getNotificationsAdmin();
+      if (response['success'] == true) {
+        final notificationsData = response['data'] as List;
+        setState(() {
+          _notifications = notificationsData.map((data) => NotificationModel.fromJson(data)).toList();
+        });
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Error loading notifications: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _addNotification() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -90,453 +95,406 @@ class _ManageNotificationsScreenState extends State<ManageNotificationsScreen> {
         'address': _addressController.text.trim(),
         'phone': _phoneController.text.trim(),
         'message': _messageController.text.trim(),
+        'latitude': _latitudeController.text.trim().isNotEmpty 
+            ? double.tryParse(_latitudeController.text.trim()) 
+            : null,
+        'longitude': _longitudeController.text.trim().isNotEmpty 
+            ? double.tryParse(_longitudeController.text.trim()) 
+            : null,
+        'location_name': _locationNameController.text.trim(),
       };
 
-      await ApiService.sendNotification(notificationData);
-      
+      final response = await ApiService.createNotification(notificationData);
+      if (response['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'Notification created successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
+        _clearForm();
+        _loadNotifications();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to create notification');
+      }
+    } catch (e) {
       Fluttertoast.showToast(
-        msg: "Notification sent successfully!",
-        backgroundColor: AppColors.successColor,
+        msg: 'Error creating notification: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
         textColor: Colors.white,
       );
-      
-      // Clear form
-      _clearForm();
-      
-      // Refresh notifications list
-      _loadNotifications(refresh: true);
-      
+    }
+
+    setState(() {
+      _isSubmitting = false;
+    });
+  }
+
+  Future<void> _updateNotification() async {
+    if (!_formKey.currentState!.validate() || _editingNotification == null) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final notificationData = {
+        'near_rib': _nearRibController.text.trim(),
+        'fullname': _fullnameController.text.trim(),
+        'address': _addressController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'message': _messageController.text.trim(),
+        'latitude': _latitudeController.text.trim().isNotEmpty 
+            ? double.tryParse(_latitudeController.text.trim()) 
+            : null,
+        'longitude': _longitudeController.text.trim().isNotEmpty 
+            ? double.tryParse(_longitudeController.text.trim()) 
+            : null,
+        'location_name': _locationNameController.text.trim(),
+      };
+
+      final response = await ApiService.updateNotification(_editingNotification!.notId!, notificationData);
+      if (response['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'Notification updated successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
+        _clearForm();
+        _loadNotifications();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to update notification');
+      }
     } catch (e) {
-      _showErrorToast('Error sending notification: ${e.toString()}');
-    } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      Fluttertoast.showToast(
+        msg: 'Error updating notification: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
+
+    setState(() {
+      _isSubmitting = false;
+    });
+  }
+
+  Future<void> _deleteNotification(NotificationModel notification) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Notification'),
+        content: Text('Are you sure you want to delete this notification from ${notification.fullname}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await ApiService.deleteNotificationAdmin(notification.notId!);
+      if (response['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'Notification deleted successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
+        _loadNotifications();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to delete notification');
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Error deleting notification: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
     }
   }
 
+  void _editNotification(NotificationModel notification) {
+    setState(() {
+      _editingNotification = notification;
+      _nearRibController.text = notification.nearRib;
+      _fullnameController.text = notification.fullname;
+      _addressController.text = notification.address;
+      _phoneController.text = notification.phone;
+      _messageController.text = notification.message;
+      _latitudeController.text = notification.latitude?.toString() ?? '';
+      _longitudeController.text = notification.longitude?.toString() ?? '';
+      _locationNameController.text = notification.locationName ?? '';
+    });
+  }
+
   void _clearForm() {
+    _formKey.currentState?.reset();
     _nearRibController.clear();
     _fullnameController.clear();
     _addressController.clear();
     _phoneController.clear();
     _messageController.clear();
+    _latitudeController.clear();
+    _longitudeController.clear();
+    _locationNameController.clear();
+    _editingNotification = null;
   }
 
-  void _showSendNotificationDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Send Notification'),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Near RIB Station
-                      DropdownSearch<String>(
-                        popupProps: const PopupProps.menu(
-                          showSearchBox: true,
-                          searchFieldProps: TextFieldProps(
-                            decoration: InputDecoration(
-                              hintText: "Search RIB station...",
-                              prefixIcon: Icon(Icons.search),
-                            ),
-                          ),
-                        ),
-                        items: const [
-                          'RIB Gasabo',
-                          'RIB Kicukiro',
-                          'RIB Nyarugenge',
-                          'RIB Bugesera',
-                          'RIB Gatsibo',
-                          'RIB Kayonza',
-                          'RIB Kirehe',
-                          'RIB Ngoma',
-                          'RIB Nyagatare',
-                          'RIB Rwamagana',
-                          'RIB Kamonyi',
-                          'RIB Muhanga',
-                          'RIB Nyanza',
-                          'RIB Ruhango',
-                          'RIB Huye',
-                          'RIB Nyamagabe',
-                          'RIB Nyaruguru',
-                          'RIB Gisagara',
-                          'RIB Burera',
-                          'RIB Gakenke',
-                          'RIB Gicumbi',
-                          'RIB Musanze',
-                          'RIB Rulindo',
-                          'RIB Karongi',
-                          'RIB Ngororero',
-                          'RIB Nyabihu',
-                          'RIB Rubavu',
-                          'RIB Rusizi',
-                          'RIB Nyamasheke',
-                        ],
-                        dropdownDecoratorProps: const DropDownDecoratorProps(
-                          dropdownSearchDecoration: InputDecoration(
-                            labelText: "Select Near RIB Station",
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        onChanged: (value) {
-                          _nearRibController.text = value ?? '';
-                        },
-                        validator: (value) => value == null ? 'Please select RIB station' : null,
-                      ),
-                      
-                      const SizedBox(height: 15),
-                      
-                      // Full Name
-                      CustomTextField(
-                        controller: _fullnameController,
-                        hintText: 'Enter Full Name',
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter full name';
-                          }
-                          return null;
-                        },
-                      ),
-                      
-                      const SizedBox(height: 15),
-                      
-                      // Address
-                      CustomTextField(
-                        controller: _addressController,
-                        hintText: 'Enter Address',
-                        maxLines: 2,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter address';
-                          }
-                          return null;
-                        },
-                      ),
-                      
-                      const SizedBox(height: 15),
-                      
-                      // Phone
-                      CustomTextField(
-                        controller: _phoneController,
-                        hintText: 'Enter Phone Number',
-                        keyboardType: TextInputType.phone,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter phone number';
-                          }
-                          return null;
-                        },
-                      ),
-                      
-                      const SizedBox(height: 15),
-                      
-                      // Message
-                      CustomTextField(
-                        controller: _messageController,
-                        hintText: 'Write Message',
-                        maxLines: 3,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter message';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    _clearForm();
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Cancel'),
-                ),
-                if (_isSubmitting)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  ElevatedButton(
-                    onPressed: () async {
-                      setDialogState(() {
-                        _isSubmitting = true;
-                      });
-                      await _sendNotification();
-                      setDialogState(() {
-                        _isSubmitting = false;
-                      });
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.successColor,
-                    ),
-                    child: const Text('Send', style: TextStyle(color: Colors.white)),
-                  ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+  Future<void> _openLocationInMaps(double? latitude, double? longitude) async {
+    if (latitude == null || longitude == null) {
+      Fluttertoast.showToast(
+        msg: 'No GPS coordinates available',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
 
-  void _showErrorToast(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: AppColors.errorColor,
-      textColor: Colors.white,
-    );
+    final url = 'https://www.google.com/maps?q=$latitude,$longitude';
+    final uri = Uri.parse(url);
+    
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      Fluttertoast.showToast(
+        msg: 'Could not open maps',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Manage Notifications', style: TextStyle(color: Colors.white)),
-        backgroundColor: AppColors.primaryColor,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add, color: Colors.white),
-            onPressed: _showSendNotificationDialog,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Search Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search notifications...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-              ),
-              onChanged: (value) {
-                // Implement search functionality
-              },
-            ),
-          ),
-          
-          // Notifications List
-          Expanded(
-            child: _isLoading && _notifications.isEmpty
-                ? const Center(child: LoadingWidget())
-                : _notifications.isEmpty
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+      body: _isLoading
+          ? const LoadingWidget()
+          : Column(
+              children: [
+                // Form Section
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey[300]!),
+                    ),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        Text(
+                          _editingNotification == null ? 'Add New Notification' : 'Edit Notification',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        Row(
                           children: [
-                            Icon(Icons.notifications_none, size: 80, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text(
-                              'No notifications found',
-                              style: TextStyle(fontSize: 18, color: Colors.grey),
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _nearRibController,
+                                hintText: 'Near RIB',
+                                labelText: 'Near RIB',
+                                validator: Validators.validateRequired,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _fullnameController,
+                                hintText: 'Full Name',
+                                labelText: 'Full Name',
+                                validator: Validators.validateRequired,
+                              ),
                             ),
                           ],
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _loadNotifications(refresh: true),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _notifications.length + (_hasMoreData ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == _notifications.length) {
-                              // Load more indicator
-                              if (_hasMoreData) {
-                                _loadNotifications();
-                                return const Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(16),
-                                    child: LoadingWidget(),
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            }
-
-                            final notification = _notifications[index];
-                            return _buildNotificationCard(notification);
-                          },
+                        const SizedBox(height: 16),
+                        
+                        CustomTextField(
+                          controller: _addressController,
+                          hintText: 'Address',
+                          labelText: 'Address',
+                          validator: Validators.validateRequired,
                         ),
-                      ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showSendNotificationDialog,
-        backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-    );
-  }
-
-  Widget _buildNotificationCard(NotificationModel notification) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Notification Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.notifications,
-                    color: AppColors.primaryColor,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        notification.fullname,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        const SizedBox(height: 16),
+                        
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _phoneController,
+                                hintText: 'Phone',
+                                labelText: 'Phone',
+                                validator: Validators.validateRequired,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _locationNameController,
+                                hintText: 'Location Name',
+                                labelText: 'Location Name',
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Text(
-                        notification.nearRib,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                        const SizedBox(height: 16),
+                        
+                        CustomTextField(
+                          controller: _messageController,
+                          hintText: 'Message',
+                          labelText: 'Message',
+                          maxLines: 3,
+                          validator: Validators.validateRequired,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (notification.createdAt != null)
-                  Text(
-                    '${notification.createdAt!.day}/${notification.createdAt!.month}/${notification.createdAt!.year}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
+                        const SizedBox(height: 16),
+                        
+                        // GPS Coordinates
+                        const Text(
+                          'GPS Coordinates (Optional)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _latitudeController,
+                                hintText: 'Latitude',
+                                labelText: 'Latitude',
+                                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _longitudeController,
+                                hintText: 'Longitude',
+                                labelText: 'Longitude',
+                                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomButton(
+                                text: _editingNotification == null ? 'Add Notification' : 'Update Notification',
+                                onPressed: _editingNotification == null ? _addNotification : _updateNotification,
+                                isLoading: _isSubmitting,
+                              ),
+                            ),
+                            if (_editingNotification != null) ...[
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: CustomButton(
+                                  text: 'Cancel',
+                                  onPressed: _clearForm,
+                                  backgroundColor: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
                   ),
+                ),
+                
+                // Notifications List
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = _notifications[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primaryColor,
+                            child: const Icon(Icons.notifications, color: Colors.white),
+                          ),
+                          title: Text(notification.fullname),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Near RIB: ${notification.nearRib}'),
+                              Text('Phone: ${notification.phone}'),
+                              Text('Address: ${notification.address}'),
+                              if (notification.locationName != null)
+                                Text('Location: ${notification.locationName}'),
+                              if (notification.latitude != null && notification.longitude != null)
+                                Text('GPS: ${notification.latitude}, ${notification.longitude}'),
+                              Text('Message: ${notification.message}'),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (notification.latitude != null && notification.longitude != null)
+                                IconButton(
+                                  onPressed: () => _openLocationInMaps(
+                                    notification.latitude, 
+                                    notification.longitude
+                                  ),
+                                  icon: const Icon(Icons.location_on),
+                                  color: AppColors.primaryColor,
+                                  tooltip: 'Open in Maps',
+                                ),
+                              IconButton(
+                                onPressed: () => _editNotification(notification),
+                                icon: const Icon(Icons.edit),
+                                color: AppColors.primaryColor,
+                              ),
+                              IconButton(
+                                onPressed: () => _deleteNotification(notification),
+                                icon: const Icon(Icons.delete),
+                                color: AppColors.errorColor,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
-            
-            const SizedBox(height: 12),
-            
-            // Notification Details
-            _buildDetailRow('Phone', notification.phone),
-            _buildDetailRow('Address', notification.address),
-            
-            const SizedBox(height: 8),
-            
-            // Message
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Message:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    notification.message,
-                    style: const TextStyle(color: Colors.black87),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 70,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(color: Colors.black54),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _nearRibController.dispose();
-    _fullnameController.dispose();
-    _addressController.dispose();
-    _phoneController.dispose();
-    _messageController.dispose();
-    super.dispose();
   }
 }

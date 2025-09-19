@@ -64,7 +64,7 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
         limit: _itemsPerPage,
       );
 
-      final List<ArrestedCriminal> newCriminals = (response['data'] as List)
+      final List<ArrestedCriminal> newCriminals = (response['data']['records'] as List)
           .map((json) => ArrestedCriminal.fromJson(json))
           .toList();
 
@@ -88,7 +88,7 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
 
   Future<void> _loadCriminalRecords() async {
     try {
-      final response = await ApiService.getCriminalRecords(limit: 1000); // Get all records
+      final response = await ApiService.getCriminalRecords(limit: 100); // Get all records
       final List<CriminalRecord> records = (response['data'] as List)
           .map((json) => CriminalRecord.fromJson(json))
           .toList();
@@ -365,11 +365,21 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
                           child: Column(
                             children: [
                               if (_selectedImage != null) ...[
-                                Image.file(
-                                  _selectedImage!,
+                                // Note: Image.file is not supported on Flutter Web
+                                // For web compatibility, you would need to use Image.network
+                                // or implement a proper file upload solution
+                                Container(
                                   height: 150,
                                   width: 150,
-                                  fit: BoxFit.cover,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 50,
+                                    color: Colors.grey,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                               ],
@@ -583,7 +593,7 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
             offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+        border: Border.all(color: Colors.grey.withOpacity(0.3), width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:dropdown_search/dropdown_search.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../services/api_service.dart';
 import '../../services/autofill_service.dart';
 import '../../models/criminal_record.dart';
@@ -52,6 +54,10 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
   // Victim-specific controllers
   final _sinnerIdController = TextEditingController();
   final _evidenceDescriptionController = TextEditingController();
+  
+  // File upload
+  List<XFile> _selectedFiles = [];
+  final ImagePicker _picker = ImagePicker();
   
   // Criminal-specific controllers
   final _descriptionController = TextEditingController();
@@ -134,16 +140,19 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
     if (idNumber.length < 8) return;
 
     try {
-      final personData = await AutofillService.searchPersonData(idNumber);
+      final response = await ApiService.searchPersonData(idNumber);
       
-      if (personData != null) {
+      if (response != null) {
+        final personType = response['type'];
+        final person = response['data'];
+        
         setState(() {
           _isAutofilledData = true;
           _nidaMessage = 'Data auto-filled from NIDA records';
           _nidaMessageType = 'success';
           
-          if (personData['type'] == 'citizen') {
-            final citizen = personData['data'] as RwandanCitizen;
+          if (personType == 'citizen') {
+            final citizen = person as RwandanCitizen;
             _autofilledCitizen = citizen;
             _autofilledPassportHolder = null;
             
@@ -159,10 +168,19 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
             _villageController.text = citizen.village ?? '';
             _phoneController.text = citizen.phone ?? '';
             _emailController.text = citizen.email ?? '';
+            
+            // Ensure address is not empty
+            String citizenAddress = '${citizen.province ?? ''}, ${citizen.district ?? ''}, ${citizen.sector ?? ''}'.trim();
+            if (citizenAddress.isEmpty || citizenAddress == ', ,' || citizenAddress == ',,') {
+              citizenAddress = 'Address not available in NIDA records';
+            }
+            _addressNowController.text = citizenAddress;
+            print('Auto-filled address for citizen: $citizenAddress');
+            
             _selectedIdType = citizen.idType;
             
-          } else if (personData['type'] == 'passport') {
-            final passportHolder = personData['data'] as PassportHolder;
+          } else if (personType == 'passport') {
+            final passportHolder = person as PassportHolder;
             _autofilledPassportHolder = passportHolder;
             _autofilledCitizen = null;
             
@@ -173,7 +191,15 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
             _selectedMaritalStatus = passportHolder.maritalStatus;
             _countryController.text = passportHolder.nationality ?? '';
             _nationalityController.text = passportHolder.nationality ?? '';
-            _addressNowController.text = passportHolder.addressInRwanda ?? '';
+            
+            // Ensure address is not empty for passport holders
+            String passportAddress = passportHolder.addressInRwanda?.trim() ?? '';
+            if (passportAddress.isEmpty) {
+              passportAddress = 'Address not available in records';
+            }
+            _addressNowController.text = passportAddress;
+            print('Auto-filled address for passport holder: $passportAddress');
+            
             _homeAddressController.text = passportHolder.homeAddress ?? '';
             _phoneController.text = passportHolder.phone ?? '';
             _emailController.text = passportHolder.email ?? '';
@@ -234,7 +260,59 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
   }
 
   Future<void> _submitVictim() async {
-    if (!_victimFormKey.currentState!.validate()) return;
+    if (!_victimFormKey.currentState!.validate()) {
+      Fluttertoast.showToast(
+        msg: "Please fill in all required fields",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedIdType == null) {
+      Fluttertoast.showToast(
+        msg: "Please select an ID type",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedGender == null) {
+      Fluttertoast.showToast(
+        msg: "Please select gender",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedMaritalStatus == null) {
+      Fluttertoast.showToast(
+        msg: "Please select marital status",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedCrimeType == null) {
+      Fluttertoast.showToast(
+        msg: "Please select crime type",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedDateCommitted == null) {
+      Fluttertoast.showToast(
+        msg: "Please select date committed",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
 
     setState(() {
       _isSubmitting = true;
@@ -242,8 +320,8 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
 
     try {
       final victim = Victim(
-        citizenId: _autofilledCitizen?.id,
-        passportHolderId: _autofilledPassportHolder?.id,
+        citizenId: _selectedIdType == 'passport' ? null : _autofilledCitizen?.id,
+        passportHolderId: _selectedIdType == 'passport' ? _autofilledPassportHolder?.id : null,
         idType: _selectedIdType!,
         idNumber: _idNumberController.text.trim(),
         firstName: _firstNameController.text.trim(),
@@ -256,21 +334,29 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
         cell: _selectedIdType == 'passport' ? null : (_cellController.text.trim().isEmpty ? null : _cellController.text.trim()),
         village: _selectedIdType == 'passport' ? null : (_villageController.text.trim().isEmpty ? null : _villageController.text.trim()),
         country: _selectedIdType == 'passport' ? (_countryController.text.trim().isEmpty ? null : _countryController.text.trim()) : null,
-        addressNow: _addressNowController.text.trim().isEmpty ? null : _addressNowController.text.trim(),
+        addressNow: _addressNowController.text.trim().isEmpty ? 'Address not provided' : _addressNowController.text.trim(),
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         victimEmail: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         maritalStatus: _selectedMaritalStatus,
         sinnerIdentification: _sinnerIdController.text.trim().isEmpty ? null : _sinnerIdController.text.trim(),
         crimeType: _selectedCrimeType!,
-        evidence: _evidenceDescriptionController.text.trim().isEmpty ? null : {
-          'description': _evidenceDescriptionController.text.trim(),
-          'files': [],
+        evidence: {
+          'description': _evidenceDescriptionController.text.trim().isEmpty ? 'No description provided' : _evidenceDescriptionController.text.trim(),
+          'files': _selectedFiles.map((file) => {
+            'name': file.name,
+            'path': file.path,
+            'size': 0, // Will be updated when file is actually uploaded
+            'type': file.name.split('.').last.toLowerCase(),
+          }).toList(),
           'uploadedAt': DateTime.now().toIso8601String(),
         },
         dateCommitted: _selectedDateCommitted,
       );
 
-      await ApiService.addVictim(victim);
+      print('Address field value before submission: "${_addressNowController.text}"');
+      print('Submitting victim: ${victim.toJson()}');
+      final response = await ApiService.addVictim(victim);
+      print('Victim response: $response');
       
       Fluttertoast.showToast(
         msg: "Victim report submitted successfully!",
@@ -281,6 +367,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       _clearForm();
       
     } catch (e) {
+      print('Error submitting victim: $e');
       Fluttertoast.showToast(
         msg: 'Error submitting victim report: ${e.toString()}',
         backgroundColor: AppColors.errorColor,
@@ -294,7 +381,59 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
   }
 
   Future<void> _submitCriminal() async {
-    if (!_criminalFormKey.currentState!.validate()) return;
+    if (!_criminalFormKey.currentState!.validate()) {
+      Fluttertoast.showToast(
+        msg: "Please fill in all required fields",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedIdType == null) {
+      Fluttertoast.showToast(
+        msg: "Please select an ID type",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedGender == null) {
+      Fluttertoast.showToast(
+        msg: "Please select gender",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedMaritalStatus == null) {
+      Fluttertoast.showToast(
+        msg: "Please select marital status",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedCrimeType == null) {
+      Fluttertoast.showToast(
+        msg: "Please select crime type",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    if (_selectedDateCommitted == null) {
+      Fluttertoast.showToast(
+        msg: "Please select date committed",
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
 
     setState(() {
       _isSubmitting = true;
@@ -302,8 +441,8 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
 
     try {
       final criminalRecord = CriminalRecord(
-        citizenId: _autofilledCitizen?.id,
-        passportHolderId: _autofilledPassportHolder?.id,
+        citizenId: _selectedIdType == 'passport' ? null : _autofilledCitizen?.id,
+        passportHolderId: _selectedIdType == 'passport' ? _autofilledPassportHolder?.id : null,
         idType: _selectedIdType!,
         idNumber: _idNumberController.text.trim(),
         firstName: _firstNameController.text.trim(),
@@ -317,14 +456,17 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
         sector: _selectedIdType == 'passport' ? null : (_sectorController.text.trim().isEmpty ? null : _sectorController.text.trim()),
         cell: _selectedIdType == 'passport' ? null : (_cellController.text.trim().isEmpty ? null : _cellController.text.trim()),
         village: _selectedIdType == 'passport' ? null : (_villageController.text.trim().isEmpty ? null : _villageController.text.trim()),
-        addressNow: _addressNowController.text.trim().isEmpty ? null : _addressNowController.text.trim(),
+        addressNow: _addressNowController.text.trim().isEmpty ? 'Address not provided' : _addressNowController.text.trim(),
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         crimeType: _selectedCrimeType!,
         description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
         dateCommitted: _selectedDateCommitted,
       );
 
-      await ApiService.addCriminalRecord(criminalRecord);
+      print('Address field value before criminal submission: "${_addressNowController.text}"');
+      print('Submitting criminal record: ${criminalRecord.toJson()}');
+      final response = await ApiService.addCriminalRecord(criminalRecord);
+      print('Criminal record response: $response');
       
       Fluttertoast.showToast(
         msg: "Criminal record added successfully!",
@@ -335,6 +477,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       _clearForm();
       
     } catch (e) {
+      print('Error submitting criminal record: $e');
       Fluttertoast.showToast(
         msg: 'Error adding criminal record: ${e.toString()}',
         backgroundColor: AppColors.errorColor,
@@ -379,6 +522,28 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       _isAutofilledData = false;
       _autofilledCitizen = null;
       _autofilledPassportHolder = null;
+      _selectedFiles.clear();
+    });
+  }
+
+  Future<void> _pickFiles() async {
+    try {
+      final List<XFile> files = await _picker.pickMultiImage();
+      setState(() {
+        _selectedFiles = files;
+      });
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Error picking files: $e',
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
+  }
+
+  void _removeFile(int index) {
+    setState(() {
+      _selectedFiles.removeAt(index);
     });
   }
 
@@ -481,12 +646,104 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
             
             const SizedBox(height: 16),
             
-            // Evidence
-            CustomTextField(
-              controller: _evidenceDescriptionController,
-              hintText: 'Describe the evidence...',
-              label: 'Evidence',
-              maxLines: 3,
+            // Evidence Section
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Evidence*',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                // Evidence Description
+                CustomTextField(
+                  controller: _evidenceDescriptionController,
+                  hintText: 'Describe the evidence...',
+                  label: 'Evidence Description',
+                  maxLines: 3,
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // File Upload Section
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _pickFiles,
+                        icon: const Icon(Icons.upload_file),
+                        label: const Text('Upload Files'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      '${_selectedFiles.length} file(s) selected',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textColor,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // Selected Files List
+                if (_selectedFiles.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Selected Files:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ..._selectedFiles.asMap().entries.map((entry) {
+                          int index = entry.key;
+                          XFile file = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.attach_file, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    file.name,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () => _removeFile(index),
+                                  icon: const Icon(Icons.close, size: 16),
+                                  color: AppColors.errorColor,
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
             
             const SizedBox(height: 30),
@@ -518,9 +775,9 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.blue.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,7 +787,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.red,
+                      color: AppColors.primaryColor,
                     ),
                   ),
                   SizedBox(height: 8),
@@ -554,7 +811,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.red,
+                color: AppColors.primaryColor,
               ),
             ),
             const SizedBox(height: 16),
@@ -576,7 +833,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
               CustomButton(
                 text: 'Submit Criminal Report',
                 onPressed: _submitCriminal,
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.primaryColor,
               ),
           ],
         ),
@@ -847,8 +1104,14 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       CustomTextField(
         controller: _addressNowController,
         hintText: 'Enter Current Address',
-        label: 'Current Address',
+        label: 'Current Address*',
         maxLines: 2,
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return 'Current address is required';
+          }
+          return null;
+        },
       ),
       
       const SizedBox(height: 16),

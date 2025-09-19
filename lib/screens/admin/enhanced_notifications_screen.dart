@@ -41,10 +41,12 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
     }
 
     try {
+      print('Loading notifications - Page: $_currentPage, Limit: $_itemsPerPage');
       final response = await ApiService.getNotifications(
         page: _currentPage,
         limit: _itemsPerPage,
       );
+      print('Notifications API response: $response');
 
       if (response['success'] == true) {
         final List<NotificationModel> newNotifications = (response['data']['notifications'] as List)

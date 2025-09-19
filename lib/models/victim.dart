@@ -115,7 +115,11 @@ class Victim {
       'marital_status': maritalStatus,
       'sinner_identification': sinnerIdentification,
       'crime_type': crimeType,
-      'evidence': evidence,
+      'evidence': evidence ?? {
+        'description': '',
+        'files': [],
+        'uploadedAt': DateTime.now().toIso8601String(),
+      },
       'date_committed': dateCommitted?.toIso8601String().split('T')[0],
       'criminal_id': criminalId,
       'registered_by': registeredBy,

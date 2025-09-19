@@ -86,11 +86,8 @@ class CriminalRecord {
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'cri_id': criId,
-      'citizen_id': citizenId,
-      'passport_holder_id': passportHolderId,
+  Map<String, dynamic> toJson({bool includeId = true}) {
+    final Map<String, dynamic> json = {
       'id_type': idType,
       'id_number': idNumber,
       'first_name': firstName,
@@ -112,5 +109,19 @@ class CriminalRecord {
       'vic_id': vicId,
       'registered_by': registeredBy,
     };
+    
+    // Only include citizen_id or passport_holder_id if they are not null
+    if (citizenId != null) {
+      json['citizen_id'] = citizenId;
+    }
+    if (passportHolderId != null) {
+      json['passport_holder_id'] = passportHolderId;
+    }
+    
+    if (includeId) {
+      json['cri_id'] = criId;
+    }
+    
+    return json;
   }
 }

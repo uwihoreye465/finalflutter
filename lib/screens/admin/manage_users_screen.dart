@@ -30,6 +30,11 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   String? _selectedRole;
   User? _editingUser;
+  
+  // Filter variables
+  String _selectedRoleFilter = 'all';
+  String _selectedApprovalFilter = 'all';
+  List<User> _filteredUsers = [];
 
   @override
   void initState() {
@@ -55,9 +60,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     try {
       final response = await ApiService.getUsersAdmin();
       if (response['success'] == true) {
-        final usersData = response['data'] as List;
+        final usersData = response['data']['users'] as List;
         setState(() {
           _users = usersData.map((userData) => User.fromJson(userData)).toList();
+          _applyFilters();
         });
       }
     } catch (e) {
@@ -240,6 +246,70 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     _editingUser = null;
   }
 
+  Future<void> _approveUser(User user) async {
+    try {
+      final response = await ApiService.approveUser(user.userId!, true);
+      if (response['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'User approved successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
+        _loadUsers();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to approve user');
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Error approving user: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
+  }
+
+  Future<void> _blockUser(User user) async {
+    try {
+      final response = await ApiService.approveUser(user.userId!, false);
+      if (response['success'] == true) {
+        Fluttertoast.showToast(
+          msg: 'User blocked successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.warningColor,
+          textColor: Colors.white,
+        );
+        _loadUsers();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to block user');
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: 'Error blocking user: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    }
+  }
+
+  void _applyFilters() {
+    setState(() {
+      _filteredUsers = _users.where((user) {
+        bool roleMatch = _selectedRoleFilter == 'all' || user.role == _selectedRoleFilter;
+        bool approvalMatch = _selectedApprovalFilter == 'all' || 
+            (_selectedApprovalFilter == 'approved' && user.isApproved) ||
+            (_selectedApprovalFilter == 'pending' && !user.isApproved);
+        return roleMatch && approvalMatch;
+      }).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -388,13 +458,71 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                   ),
                 ),
                 
+                // Filter Section
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey[300]!),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedRoleFilter,
+                          decoration: const InputDecoration(
+                            labelText: 'Filter by Role',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          items: [
+                            const DropdownMenuItem(value: 'all', child: Text('All Roles')),
+                            const DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                            const DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedRoleFilter = value ?? 'all';
+                            });
+                            _applyFilters();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedApprovalFilter,
+                          decoration: const InputDecoration(
+                            labelText: 'Filter by Status',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          items: [
+                            const DropdownMenuItem(value: 'all', child: Text('All Users')),
+                            const DropdownMenuItem(value: 'approved', child: Text('Approved')),
+                            const DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedApprovalFilter = value ?? 'all';
+                            });
+                            _applyFilters();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
                 // Users List
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _users.length,
+                    itemCount: _filteredUsers.length,
                     itemBuilder: (context, index) {
-                      final user = _users[index];
+                      final user = _filteredUsers[index];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
@@ -423,15 +551,31 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (!user.isApproved)
+                                IconButton(
+                                  onPressed: () => _approveUser(user),
+                                  icon: const Icon(Icons.check_circle),
+                                  color: AppColors.successColor,
+                                  tooltip: 'Approve User',
+                                ),
+                              if (user.isApproved)
+                                IconButton(
+                                  onPressed: () => _blockUser(user),
+                                  icon: const Icon(Icons.block),
+                                  color: AppColors.warningColor,
+                                  tooltip: 'Block User',
+                                ),
                               IconButton(
                                 onPressed: () => _editUser(user),
                                 icon: const Icon(Icons.edit),
                                 color: AppColors.primaryColor,
+                                tooltip: 'Edit User',
                               ),
                               IconButton(
                                 onPressed: () => _deleteUser(user),
                                 icon: const Icon(Icons.delete),
                                 color: AppColors.errorColor,
+                                tooltip: 'Delete User',
                               ),
                             ],
                           ),

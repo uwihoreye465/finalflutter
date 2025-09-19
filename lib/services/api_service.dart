@@ -238,7 +238,7 @@ class ApiService {
       final response = await http.post(
         Uri.parse(_url('/criminal-records')),
         headers: headers,
-        body: jsonEncode(record.toJson()),
+        body: jsonEncode(record.toJson(includeId: false)),
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -365,7 +365,7 @@ class ApiService {
       final response = await http.put(
         Uri.parse(_url('/users/$userId/approval')),
         headers: headers,
-        body: jsonEncode({'approved': approve}),
+        body: jsonEncode({'approval': approve.toString()}),
       );
 
       if (response.statusCode == 200) {
@@ -732,6 +732,26 @@ class ApiService {
         return jsonDecode(response.body);
       } else {
         throw Exception('Failed to fetch pending users: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+
+  static Future<Map<String, dynamic>> updateUserRole(int userId, String role) async {
+    try {
+      final headers = await _getJsonHeaders();
+      final response = await http.put(
+        Uri.parse(_url('/users/$userId')),
+        headers: headers,
+        body: jsonEncode({'role': role}),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to update user role: ${response.body}');
       }
     } catch (e) {
       throw Exception('Network error: $e');

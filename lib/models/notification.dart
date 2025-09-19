@@ -33,8 +33,8 @@ class NotificationModel {
       address: json['address'] ?? '',
       phone: json['phone'] ?? '',
       message: json['message'] ?? '',
-      latitude: json['latitude']?.toDouble(),
-      longitude: json['longitude']?.toDouble(),
+      latitude: json['latitude'] != null ? double.tryParse(json['latitude'].toString()) : null,
+      longitude: json['longitude'] != null ? double.tryParse(json['longitude'].toString()) : null,
       locationName: json['location_name'],
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at']) 

@@ -10,12 +10,13 @@ import '../../models/notification.dart';
 import '../../models/user.dart';
 import '../../utils/constants.dart';
 import '../../widgets/loading_widget.dart';
-import 'manage_criminal_records_screen.dart';
-import 'manage_victims_screen.dart';
+import 'enhanced_criminal_management_screen.dart';
+import 'enhanced_victim_management_screen.dart';
 import 'manage_arrested_criminals_screen.dart';
 import 'enhanced_notifications_screen.dart';
 import 'manage_users_screen.dart';
 import 'enhanced_statistics_screen.dart';
+import '../user/enhanced_report_screen.dart';
 import '../auth/login_screen.dart';
 
 class EnhancedAdminDashboard extends StatefulWidget {
@@ -44,7 +45,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
     _loadStatistics();
   }
 
@@ -232,6 +233,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
             Tab(text: 'Victims', icon: Icon(Icons.people)),
             Tab(text: 'Notifications', icon: Icon(Icons.notifications)),
             Tab(text: 'Users', icon: Icon(Icons.admin_panel_settings)),
+            Tab(text: 'Report', icon: Icon(Icons.add_alert)),
             Tab(text: 'Statistics', icon: Icon(Icons.analytics)),
           ],
         ),
@@ -242,11 +244,12 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
               controller: _tabController,
               children: [
                 _buildDashboard(),
-                const ManageCriminalRecordsScreen(),
+                const EnhancedCriminalManagementScreen(),
                 const ManageArrestedCriminalsScreen(),
-                const ManageVictimsScreen(),
+                const EnhancedVictimManagementScreen(),
                 const EnhancedNotificationsScreen(),
                 const ManageUsersScreen(),
+                const EnhancedReportScreen(),
                 const EnhancedStatisticsScreen(),
               ],
             ),

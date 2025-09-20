@@ -229,11 +229,11 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
         children: [
           // Summary Cards
           _buildSummaryCards(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 26),
           
           // Quick Stats
           _buildQuickStats(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 26),
           
           // Recent Activity
           _buildRecentActivity(),

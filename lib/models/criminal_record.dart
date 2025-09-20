@@ -86,41 +86,53 @@ class CriminalRecord {
     );
   }
 
-  Map<String, dynamic> toJson({bool includeId = true}) {
+  Map<String, dynamic> toJson({bool includeId = true, bool forCreation = false}) {
     final Map<String, dynamic> json = {
       'id_type': idType,
       'id_number': idNumber,
-      'first_name': firstName,
-      'last_name': lastName,
-      'gender': gender,
-      'date_of_birth': dateOfBirth?.toIso8601String().split('T')[0],
-      'marital_status': maritalStatus,
-      'country': country,
-      'province': province,
-      'district': district,
-      'sector': sector,
-      'cell': cell,
-      'village': village,
       'address_now': addressNow,
       'phone': phone,
       'crime_type': crimeType,
       'description': description,
       'date_committed': dateCommitted?.toIso8601String().split('T')[0],
-      'vic_id': vicId,
-      'registered_by': registeredBy,
     };
     
-    // Only include citizen_id or passport_holder_id if they are not null
-    if (citizenId != null) {
-      json['citizen_id'] = citizenId;
-    }
-    if (passportHolderId != null) {
-      json['passport_holder_id'] = passportHolderId;
+    // Only include additional fields if not for creation
+    if (!forCreation) {
+      json['first_name'] = firstName;
+      json['last_name'] = lastName;
+      json['gender'] = gender;
+      json['date_of_birth'] = dateOfBirth?.toIso8601String().split('T')[0];
+      json['marital_status'] = maritalStatus;
+      json['country'] = country;
+      json['province'] = province;
+      json['district'] = district;
+      json['sector'] = sector;
+      json['cell'] = cell;
+      json['village'] = village;
+      json['vic_id'] = vicId;
+      json['registered_by'] = registeredBy;
     }
     
-    if (includeId) {
+    // Only include the correct ID based on id_type
+    if (idType == 'passport') {
+      if (passportHolderId != null) {
+        json['passport_holder_id'] = passportHolderId;
+      }
+      // Don't include citizen_id for passport holders
+    } else {
+      if (citizenId != null) {
+        json['citizen_id'] = citizenId;
+      }
+      // Don't include passport_holder_id for citizens
+    }
+    
+    if (includeId && criId != null) {
       json['cri_id'] = criId;
     }
+    
+    // Remove null values to prevent sending them to API
+    json.removeWhere((key, value) => value == null);
     
     return json;
   }

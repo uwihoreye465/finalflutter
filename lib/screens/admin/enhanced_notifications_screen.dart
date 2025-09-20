@@ -23,6 +23,8 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
   final TextEditingController _searchController = TextEditingController();
   String? _selectedRibFilter;
   bool _showUnreadOnly = false;
+  int _totalUnread = 0;
+  int _totalRead = 0;
 
   @override
   void initState() {
@@ -53,11 +55,26 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
             .map((json) => NotificationModel.fromJson(json))
             .toList();
 
+        // Calculate unread and read counts
+        int unreadCount = 0;
+        int readCount = 0;
+        for (var notification in newNotifications) {
+          if (notification.isRead) {
+            readCount++;
+          } else {
+            unreadCount++;
+          }
+        }
+
         setState(() {
           if (refresh) {
             _notifications = newNotifications;
+            _totalUnread = unreadCount;
+            _totalRead = readCount;
           } else {
             _notifications.addAll(newNotifications);
+            _totalUnread += unreadCount;
+            _totalRead += readCount;
           }
           _hasMoreData = newNotifications.length == _itemsPerPage;
           _currentPage++;
@@ -74,11 +91,50 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
     }
   }
 
+  Future<void> _markAsRead(int notificationId) async {
+    try {
+      final response = await ApiService.markNotificationAsRead(notificationId);
+      if (response['success'] == true) {
+        setState(() {
+          final index = _notifications.indexWhere((n) => n.notId == notificationId);
+          if (index != -1) {
+            _notifications[index] = NotificationModel(
+              notId: _notifications[index].notId,
+              nearRib: _notifications[index].nearRib,
+              fullname: _notifications[index].fullname,
+              address: _notifications[index].address,
+              phone: _notifications[index].phone,
+              message: _notifications[index].message,
+              latitude: _notifications[index].latitude,
+              longitude: _notifications[index].longitude,
+              locationName: _notifications[index].locationName,
+              createdAt: _notifications[index].createdAt,
+              isRead: true, // Mark as read
+            );
+            _totalUnread--;
+            _totalRead++;
+          }
+        });
+        _showSuccessToast('Notification marked as read');
+      } else {
+        _showErrorToast('Failed to mark notification as read: ${response['message']}');
+      }
+    } catch (e) {
+      _showErrorToast('Error marking notification as read: ${e.toString()}');
+    }
+  }
+
   Future<void> _deleteNotification(int notificationId) async {
     try {
       await ApiService.deleteNotification(notificationId);
       
       setState(() {
+        final notification = _notifications.firstWhere((n) => n.notId == notificationId);
+        if (!notification.isRead) {
+          _totalUnread--;
+        } else {
+          _totalRead--;
+        }
         _notifications.removeWhere((notification) => notification.notId == notificationId);
       });
       
@@ -92,6 +148,38 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
     }
   }
 
+  Widget _buildCountCard(String label, int count, Color color) {
+    return Column(
+      children: [
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: color.withOpacity(0.8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: AppColors.successColor,
+      textColor: Colors.white,
+    );
+  }
+
   void _showErrorToast(String message) {
     Fluttertoast.showToast(
       msg: message,
@@ -102,13 +190,28 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
     );
   }
 
-  void _launchMaps(double latitude, double longitude) async {
-    final url = 'https://www.google.com/maps?q=$latitude,$longitude';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      _showErrorToast('Could not launch maps');
+  Future<void> _openGoogleMaps(double? latitude, double? longitude) async {
+    if (latitude == null || longitude == null) {
+      _showErrorToast('GPS coordinates not available');
+      return;
     }
+
+    try {
+      final String googleMapsUrl = 'https://www.google.com/maps?q=$latitude,$longitude';
+      final Uri uri = Uri.parse(googleMapsUrl);
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _showErrorToast('Could not open Google Maps');
+      }
+    } catch (e) {
+      _showErrorToast('Error opening Google Maps: $e');
+    }
+  }
+
+  void _launchMaps(double latitude, double longitude) async {
+    await _openGoogleMaps(latitude, longitude);
   }
 
   List<NotificationModel> get _filteredNotifications {
@@ -169,6 +272,26 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
                     setState(() {});
                   },
                 ),
+                const SizedBox(height: 12),
+                
+                // Total Counts Display
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildCountCard('Total', _notifications.length, AppColors.primaryColor),
+                      _buildCountCard('Unread', _totalUnread, AppColors.warningColor),
+                      _buildCountCard('Read', _totalRead, AppColors.successColor),
+                    ],
+                  ),
+                ),
+                
                 const SizedBox(height: 12),
                 
                 // Filter Row
@@ -433,11 +556,19 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
                 ),
                 Row(
                   children: [
+                    if (!notification.isRead)
+                      IconButton(
+                        onPressed: () => notification.notId != null 
+                            ? _markAsRead(notification.notId!)
+                            : null,
+                        icon: const Icon(Icons.mark_email_read, color: AppColors.successColor),
+                        tooltip: 'Mark as Read',
+                      ),
                     IconButton(
                       onPressed: () => notification.notId != null 
                           ? _deleteNotification(notification.notId!)
                           : null,
-                      icon: const Icon(Icons.delete, color: Colors.red),
+                      icon: const Icon(Icons.delete, color: AppColors.errorColor),
                       tooltip: 'Delete',
                     ),
                   ],

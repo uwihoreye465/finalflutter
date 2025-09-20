@@ -12,7 +12,7 @@ import '../../utils/constants.dart';
 import '../../widgets/loading_widget.dart';
 import 'enhanced_criminal_management_screen.dart';
 import 'enhanced_victim_management_screen.dart';
-import 'manage_arrested_criminals_screen.dart';
+import 'enhanced_arrested_criminals_screen.dart';
 import 'enhanced_notifications_screen.dart';
 import 'manage_users_screen.dart';
 import 'enhanced_statistics_screen.dart';
@@ -245,7 +245,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
               children: [
                 _buildDashboard(),
                 const EnhancedCriminalManagementScreen(),
-                const ManageArrestedCriminalsScreen(),
+                const EnhancedArrestedCriminalsScreen(),
                 const EnhancedVictimManagementScreen(),
                 const EnhancedNotificationsScreen(),
                 const ManageUsersScreen(),

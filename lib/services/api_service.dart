@@ -238,7 +238,7 @@ class ApiService {
       final response = await http.post(
         Uri.parse(_url('/criminal-records')),
         headers: headers,
-        body: jsonEncode(record.toJson(includeId: false)),
+        body: jsonEncode(record.toJson(includeId: false, forCreation: true)),
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -409,7 +409,7 @@ class ApiService {
       final response = await http.put(
         Uri.parse(_url('/criminal-records/$id')),
         headers: headers,
-        body: jsonEncode(record.toJson()),
+        body: jsonEncode(record.toJson(includeId: false)),
       );
 
       if (response.statusCode == 200) {
@@ -1196,4 +1196,25 @@ class ApiService {
       throw Exception('Error getting arrested criminals statistics: $e');
     }
   }
+
+  // Mark notification as read
+  static Future<Map<String, dynamic>> markNotificationAsRead(int notificationId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(
+        Uri.parse(_url('/notifications/$notificationId/read')),
+        headers: headers,
+        body: jsonEncode({'is_read': true}),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to mark notification as read: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error marking notification as read: $e');
+    }
+  }
+
 }

@@ -441,21 +441,21 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
 
     try {
       final criminalRecord = CriminalRecord(
-        citizenId: _selectedIdType == 'passport' ? null : _autofilledCitizen?.id,
-        passportHolderId: _selectedIdType == 'passport' ? _autofilledPassportHolder?.id : null,
+        citizenId: null, // Don't include citizen_id for creation
+        passportHolderId: null, // Don't include passport_holder_id for creation
         idType: _selectedIdType!,
         idNumber: _idNumberController.text.trim(),
-        firstName: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
-        gender: _selectedGender!,
-        dateOfBirth: _selectedDateOfBirth,
-        maritalStatus: _selectedMaritalStatus,
-        country: _selectedIdType == 'passport' ? (_countryController.text.trim().isEmpty ? null : _countryController.text.trim()) : null,
-        province: _selectedIdType == 'passport' ? null : (_provinceController.text.trim().isEmpty ? null : _provinceController.text.trim()),
-        district: _selectedIdType == 'passport' ? null : (_districtController.text.trim().isEmpty ? null : _districtController.text.trim()),
-        sector: _selectedIdType == 'passport' ? null : (_sectorController.text.trim().isEmpty ? null : _sectorController.text.trim()),
-        cell: _selectedIdType == 'passport' ? null : (_cellController.text.trim().isEmpty ? null : _cellController.text.trim()),
-        village: _selectedIdType == 'passport' ? null : (_villageController.text.trim().isEmpty ? null : _villageController.text.trim()),
+        firstName: '', // Empty string for creation
+        lastName: '',
+        gender: '',
+        dateOfBirth: null,
+        maritalStatus: null,
+        country: null,
+        province: null,
+        district: null,
+        sector: null,
+        cell: null,
+        village: null,
         addressNow: _addressNowController.text.trim().isEmpty ? 'Address not provided' : _addressNowController.text.trim(),
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         crimeType: _selectedCrimeType!,

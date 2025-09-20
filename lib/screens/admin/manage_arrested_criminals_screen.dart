@@ -431,7 +431,7 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.errorColor,
                     ),
                     child: const Text('Add to News', style: TextStyle(color: Colors.white)),
                   ),
@@ -475,16 +475,16 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: Colors.red.withOpacity(0.1),
+            color: AppColors.warningColor.withOpacity(0.1),
             child: const Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.red),
+                Icon(Icons.info_outline, color: AppColors.warningColor),
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Arrested criminals added here will appear in the News section for public viewing.',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: AppColors.warningColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -574,7 +574,7 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddArrestedCriminalDialog,
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.errorColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -643,7 +643,7 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
                     criminal.crimeType,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.red[700],
+                      color: AppColors.errorColor,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -673,7 +673,7 @@ class _ManageArrestedCriminalsScreenState extends State<ManageArrestedCriminalsS
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.red,
+                color: AppColors.errorColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(

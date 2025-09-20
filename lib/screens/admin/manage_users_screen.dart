@@ -159,6 +159,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
         );
         _clearForm();
         _loadUsers();
+        Navigator.of(context).pop(); // Close the dialog
       } else {
         throw Exception(response['message'] ?? 'Failed to update user');
       }

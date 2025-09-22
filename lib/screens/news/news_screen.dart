@@ -63,11 +63,34 @@ class _NewsScreenState extends State<NewsScreen> {
                 recordMap = Map<String, dynamic>.from(record);
               }
               
+              // Handle image_url which might be a Buffer object
+              String? imageUrl;
+              if (recordMap['image_url'] != null) {
+                if (recordMap['image_url'] is Map) {
+                  final imageData = recordMap['image_url'] as Map<String, dynamic>;
+                  if (imageData['type'] == 'Buffer' && imageData['data'] != null) {
+                    // Convert buffer data to string - handle both List<int> and List<dynamic>
+                    final bufferData = imageData['data'];
+                    if (bufferData is List<int>) {
+                      imageUrl = String.fromCharCodes(bufferData);
+                    } else if (bufferData is List) {
+                      // Convert List<dynamic> to List<int>
+                      final intList = bufferData.map((e) => e as int).toList();
+                      imageUrl = String.fromCharCodes(intList);
+                    }
+                  } else {
+                    imageUrl = recordMap['image_url']?.toString();
+                  }
+                } else {
+                  imageUrl = recordMap['image_url']?.toString();
+                }
+              }
+              
               // Extract only essential fields for news display
               return ArrestedCriminal(
                 arrestId: recordMap['arrest_id'] ?? 0,
                 fullname: recordMap['fullname']?.toString() ?? 'Unknown',
-                imageUrl: recordMap['image_url']?.toString(),
+                imageUrl: imageUrl,
                 crimeType: recordMap['crime_type']?.toString() ?? 'Unknown Crime',
                 dateArrested: recordMap['date_arrested'] != null 
                     ? DateTime.parse(recordMap['date_arrested'].toString())

@@ -91,12 +91,20 @@ class _RecordsOverviewScreenState extends State<RecordsOverviewScreen> {
   }
 
   Future<Map<String, String>> _getAuthHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+    } catch (e) {
+      debugPrint('Error getting auth headers: $e');
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ',
+      };
+    }
   }
 
   void _showErrorToast(String message) {

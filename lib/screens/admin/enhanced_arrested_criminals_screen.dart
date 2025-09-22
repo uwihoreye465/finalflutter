@@ -85,10 +85,17 @@ class _EnhancedArrestedCriminalsScreenState extends State<EnhancedArrestedCrimin
                 if (jsonMap['image_url'] != null && jsonMap['image_url'] is Map) {
                   final imageData = jsonMap['image_url'] as Map<String, dynamic>;
                   if (imageData['type'] == 'Buffer' && imageData['data'] != null) {
-                    // Convert buffer data to string
-                    final bufferData = imageData['data'] as List<int>;
-                    final imageString = String.fromCharCodes(bufferData);
-                    jsonMap['image_url'] = imageString;
+                    // Convert buffer data to string - handle both List<int> and List<dynamic>
+                    final bufferData = imageData['data'];
+                    if (bufferData is List<int>) {
+                      final imageString = String.fromCharCodes(bufferData);
+                      jsonMap['image_url'] = imageString;
+                    } else if (bufferData is List) {
+                      // Convert List<dynamic> to List<int>
+                      final intList = bufferData.map((e) => e as int).toList();
+                      final imageString = String.fromCharCodes(intList);
+                      jsonMap['image_url'] = imageString;
+                    }
                   }
                 }
                 

@@ -51,7 +51,17 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
       print('Notifications API response: $response');
 
       if (response['success'] == true) {
-        final List<NotificationModel> newNotifications = (response['data']['notifications'] as List)
+        // Handle both direct array and nested notifications structure
+        List<dynamic> notificationsData;
+        if (response['data'] is List) {
+          notificationsData = response['data'] as List;
+        } else if (response['data']['notifications'] != null) {
+          notificationsData = response['data']['notifications'] as List;
+        } else {
+          notificationsData = [];
+        }
+        
+        final List<NotificationModel> newNotifications = notificationsData
             .map((json) => NotificationModel.fromJson(json))
             .toList();
 

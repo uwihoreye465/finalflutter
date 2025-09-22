@@ -417,16 +417,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          _clearForm();
-          _showAddUserDialog();
-        },
-        backgroundColor: AppColors.primaryColor,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add User'),
-      ),
       body: _isLoading
           ? const LoadingWidget()
           : Column(

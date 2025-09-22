@@ -96,7 +96,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         ApiService.getCriminalRecordsStatistics(),
         ApiService.getArrestedStatistics(),
         ApiService.getVictimsStatistics(),
-        ApiService.getNotificationStatistics(),
+        _loadNotificationStats(),
         _loadUserStatistics(),
       ]);
 
@@ -171,6 +171,43 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
       }
     } catch (e) {
       debugPrint('Error loading user statistics: $e');
+      return {'success': false, 'data': {}};
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadNotificationStats() async {
+    try {
+      final response = await ApiService.getNotificationsAdmin();
+      if (response['success'] == true) {
+        // Handle both direct array and nested notifications structure
+        List<dynamic> notifications;
+        if (response['data'] is List) {
+          notifications = response['data'] as List;
+        } else if (response['data']['notifications'] != null) {
+          notifications = response['data']['notifications'] as List;
+        } else {
+          notifications = [];
+        }
+        
+        final totalNotifications = notifications.length;
+        final unreadNotifications = notifications.where((notification) => notification['is_read'] == false).length;
+        final readNotifications = notifications.where((notification) => notification['is_read'] == true).length;
+
+        return {
+          'success': true,
+          'data': {
+            'overall_statistics': {
+              'total_messages': totalNotifications,
+              'unread_messages': unreadNotifications,
+              'read_messages': readNotifications,
+            }
+          }
+        };
+      } else {
+        return {'success': false, 'data': {}};
+      }
+    } catch (e) {
+      debugPrint('Error loading notification statistics: $e');
       return {'success': false, 'data': {}};
     }
   }

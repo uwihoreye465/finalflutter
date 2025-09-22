@@ -36,6 +36,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   String _selectedApprovalFilter = 'all';
   List<User> _filteredUsers = [];
   
+  // User statistics
+  int _totalUsers = 0;
+  int _pendingUsers = 0;
 
   @override
   void initState() {
@@ -64,6 +67,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
         final usersData = response['data']['users'] as List;
         setState(() {
           _users = usersData.map((userData) => User.fromJson(userData)).toList();
+          _calculateStatistics();
           _applyFilters();
         });
       }
@@ -81,6 +85,12 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       _isLoading = false;
     });
   }
+
+  void _calculateStatistics() {
+    _totalUsers = _users.length;
+    _pendingUsers = _users.where((user) => user.isApproved == false).length;
+  }
+
 
   Future<void> _addUser() async {
     if (!_formKey.currentState!.validate()) return;
@@ -422,6 +432,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           : Column(
               children: [
                 // Statistics Section
+                _buildStatisticsSection(),
                 
                 // Filter Section
                 Container(
@@ -547,6 +558,88 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildStatisticsSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey[300]!),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'User Statistics',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  'Total Users',
+                  _totalUsers.toString(),
+                  Icons.people,
+                  AppColors.primaryColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  'Pending',
+                  _pendingUsers.toString(),
+                  Icons.pending,
+                  AppColors.warningColor,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String count, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            count,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 

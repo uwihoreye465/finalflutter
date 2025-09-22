@@ -41,39 +41,24 @@ class _RecordsOverviewScreenState extends State<RecordsOverviewScreen> {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['data'] != null) {
           final List<dynamic> records = data['data'] as List;
-          final List<Map<String, dynamic>> combinedData = [];
+          
+          // Keep the original victim data structure with criminal records intact
+          List<Map<String, dynamic>> victimData = [];
           
           for (var record in records) {
             final victim = record as Map<String, dynamic>;
-            
-            // Add victim record
-            final victimFirstName = victim['first_name']?.toString() ?? 'Unknown';
-            final victimLastName = victim['last_name']?.toString() ?? 'Unknown';
-            combinedData.add({
-              'type': 'Victim',
-              'id_number': victim['id_number']?.toString() ?? 'N/A',
-              'name': '$victimFirstName $victimLastName',
-              'crime_type': victim['crime_type']?.toString() ?? 'Unknown',
-              'date_committed': victim['date_committed']?.toString() ?? 'N/A',
-              'record_id': victim['vic_id']?.toString() ?? 'N/A',
-            });
-            
-            // Add associated criminal records
+            // Add the victim data as-is, keeping criminal_records intact
+            victimData.add(victim);
+          }
+          
+          debugPrint('Loaded ${victimData.length} victims with criminal records');
+          for (var victim in victimData) {
             final criminalRecords = victim['criminal_records'] as List? ?? [];
-            for (var criminal in criminalRecords) {
-              combinedData.add({
-                'type': 'Criminal',
-                'id_number': victim['id_number']?.toString() ?? 'N/A', // Same ID as victim
-                'name': '$victimFirstName $victimLastName', // Same name as victim
-                'crime_type': criminal['crime_type']?.toString() ?? 'Unknown',
-                'date_committed': criminal['date_committed']?.toString() ?? 'N/A',
-                'record_id': criminal['criminal_record_id']?.toString() ?? 'N/A',
-              });
-            }
+            debugPrint('Victim ${victim['first_name']} has ${criminalRecords.length} criminal records');
           }
           
           setState(() {
-            _victimsWithCriminals = combinedData;
+            _victimsWithCriminals = victimData;
             _isLoading = false;
           });
         } else {
@@ -142,108 +127,466 @@ class _RecordsOverviewScreenState extends State<RecordsOverviewScreen> {
       );
     }
 
-    // Create a combined list of all records (victims and their criminal records)
-    List<Map<String, dynamic>> allRecords = [];
-    
-    for (var victim in _victimsWithCriminals) {
-      // Add victim record
-      allRecords.add({
-        'type': 'Victim',
-        'id_number': victim['id_number'],
-        'first_name': victim['first_name'],
-        'last_name': victim['last_name'],
-        'crime_type': victim['crime_type'],
-        'date_committed': victim['date_committed'],
-        'record_id': victim['vic_id'],
-      });
-      
-      // Add associated criminal records
-      final criminalRecords = victim['criminal_records'] as List<dynamic>? ?? [];
-      for (var criminal in criminalRecords) {
-        allRecords.add({
-          'type': 'Criminal',
-          'id_number': victim['id_number'],
-          'first_name': victim['first_name'],
-          'last_name': victim['last_name'],
-          'crime_type': criminal['crime_type'],
-          'date_committed': criminal['date_committed'],
-          'record_id': criminal['criminal_record_id'],
-        });
-      }
-    }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('Type')),
-          DataColumn(label: Text('ID Number')),
-          DataColumn(label: Text('Name')),
-          DataColumn(label: Text('Crime Type')),
-          DataColumn(label: Text('Date Committed')),
-          DataColumn(label: Text('Record ID')),
-        ],
-        rows: allRecords.map((record) {
-          final isVictim = record['type'] == 'Victim';
-          return DataRow(
-            cells: [
-              DataCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isVictim 
-                        ? AppColors.warningColor.withOpacity(0.1)
-                        : AppColors.errorColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isVictim 
-                          ? AppColors.warningColor.withOpacity(0.3)
-                          : AppColors.errorColor.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Text(
-                    record['type'],
-                    style: TextStyle(
-                      color: isVictim ? AppColors.warningColor : AppColors.errorColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+    return Column(
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryColor,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(8),
+              topRight: Radius.circular(8),
+            ),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.table_chart, color: Colors.white, size: 24),
+              SizedBox(width: 12),
+              Text(
+                'Records Overview',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              DataCell(Text(record['id_number'] ?? 'N/A')),
-              DataCell(Text('${record['first_name']} ${record['last_name']}')),
-              DataCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isVictim 
-                        ? AppColors.warningColor.withOpacity(0.1)
-                        : AppColors.errorColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isVictim 
-                          ? AppColors.warningColor.withOpacity(0.3)
-                          : AppColors.errorColor.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Text(
-                    record['crime_type'] ?? 'N/A',
-                    style: TextStyle(
-                      color: isVictim ? AppColors.warningColor : AppColors.errorColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              DataCell(Text(
-                record['date_committed'] != null
-                    ? DateTime.parse(record['date_committed']).toString().split(' ')[0]
-                    : 'N/A',
-              )),
-              DataCell(Text(record['record_id']?.toString() ?? 'N/A')),
             ],
-          );
-        }).toList(),
+          ),
+        ),
+        
+        // Records as Combined Boxes
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _victimsWithCriminals.length,
+            itemBuilder: (context, index) {
+              final victimData = _victimsWithCriminals[index];
+              return _buildVictimCriminalBox(victimData);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVictimCriminalBox(Map<String, dynamic> victimData) {
+    final victimName = '${victimData['first_name'] ?? ''} ${victimData['last_name'] ?? ''}'.trim();
+    final victimId = victimData['id_number'] ?? 'N/A';
+    final victimCrimeType = victimData['crime_type'] ?? 'N/A';
+    final victimDateCommitted = victimData['date_committed'] != null
+        ? DateTime.parse(victimData['date_committed']).toString().split(' ')[0]
+        : 'N/A';
+    final victimRegisteredBy = victimData['registered_by']?.toString() ?? 'N/A';
+    final criminalRecords = victimData['criminal_records'] as List<dynamic>? ?? [];
+    
+    // Debug logging
+    debugPrint('Building victim box for: $victimName');
+    debugPrint('Criminal records count: ${criminalRecords.length}');
+    debugPrint('Criminal records: $criminalRecords');
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.primaryColor,
+          width: 2,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with Crime Type
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.primaryColor,
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.gavel, color: AppColors.primaryColor, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Crime Type: $victimCrimeType',
+                    style: TextStyle(
+                      color: AppColors.primaryColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Victim Section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.warningColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.warningColor,
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.person, color: AppColors.warningColor, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'VICTIM',
+                        style: TextStyle(
+                          color: AppColors.warningColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildDetailRow('ID Number', victimId, Icons.badge),
+                  _buildDetailRow('Name', victimName, Icons.person_outline),
+                  _buildDetailRow('Date Committed', victimDateCommitted, Icons.calendar_today),
+                  _buildDetailRow('Registered By', victimRegisteredBy, Icons.admin_panel_settings),
+                ],
+              ),
+            ),
+            
+            // Criminal Records Section
+            if (criminalRecords.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.errorColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.errorColor,
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.gavel, color: AppColors.errorColor, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'CRIMINAL RECORDS',
+                          style: TextStyle(
+                            color: AppColors.errorColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...criminalRecords.map((criminal) {
+                      final criminalId = criminal['criminal_record_id']?.toString() ?? 'N/A';
+                      final criminalName = '${criminal['first_name'] ?? ''} ${criminal['last_name'] ?? ''}'.trim();
+                      final criminalIdNumber = criminal['id_number']?.toString() ?? 'N/A';
+                      final criminalCrimeType = criminal['crime_type'] ?? 'N/A';
+                      final criminalDateCommitted = criminal['date_committed'] != null
+                          ? DateTime.parse(criminal['date_committed']).toString().split(' ')[0]
+                          : 'N/A';
+                      final criminalRegisteredBy = criminal['registered_by']?.toString() ?? 'N/A';
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AppColors.errorColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildDetailRow('Criminal ID', criminalId, Icons.badge),
+                            _buildDetailRow('ID Number', criminalIdNumber, Icons.credit_card),
+                            _buildDetailRow('Name', criminalName, Icons.person_outline),
+                            _buildDetailRow('Crime Type', criminalCrimeType, Icons.gavel),
+                            _buildDetailRow('Date Committed', criminalDateCommitted, Icons.calendar_today),
+                            _buildDetailRow('Registered By', criminalRegisteredBy, Icons.admin_panel_settings),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.grey,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.grey, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'No criminal records associated with this victim',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+              fontSize: 14,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildOldDataTable() {
+    // This is the old DataTable implementation - keeping for reference
+    List<Map<String, dynamic>> allRecords = _victimsWithCriminals;
+
+    return Card(
+      elevation: 4,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columnSpacing: 20,
+          horizontalMargin: 16,
+          columns: const [
+            DataColumn(
+              label: Text(
+                'Type',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'ID Number',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'Name',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'Crime Type',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'Date Committed',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'Record ID',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'Registered By',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+          ],
+          rows: allRecords.map((record) {
+            final isVictim = record['type'] == 'Victim';
+            return DataRow(
+              color: MaterialStateProperty.resolveWith<Color?>(
+                (Set<MaterialState> states) {
+                  if (states.contains(MaterialState.hovered)) {
+                    return Colors.grey.withOpacity(0.1);
+                  }
+                  return null;
+                },
+              ),
+              cells: [
+                DataCell(
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isVictim 
+                          ? AppColors.warningColor.withOpacity(0.1)
+                          : AppColors.errorColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isVictim 
+                            ? AppColors.warningColor.withOpacity(0.5)
+                            : AppColors.errorColor.withOpacity(0.5),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isVictim ? Icons.person : Icons.gavel,
+                          size: 16,
+                          color: isVictim ? AppColors.warningColor : AppColors.errorColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          record['type'],
+                          style: TextStyle(
+                            color: isVictim ? AppColors.warningColor : AppColors.errorColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      record['id_number'] ?? 'N/A',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    record['name'] ?? 'N/A',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.primaryColor.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Text(
+                      record['crime_type'] ?? 'N/A',
+                      style: TextStyle(
+                        color: AppColors.primaryColor,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      record['date_committed'] != null
+                          ? DateTime.parse(record['date_committed']).toString().split(' ')[0]
+                          : 'N/A',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    record['record_id']?.toString() ?? 'N/A',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    record['registered_by']?.toString() ?? 'N/A',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
       ),
     );
   }

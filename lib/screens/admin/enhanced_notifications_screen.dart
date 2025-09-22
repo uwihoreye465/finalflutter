@@ -130,7 +130,12 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
         _showErrorToast('Failed to mark notification as read: ${response['message']}');
       }
     } catch (e) {
-      _showErrorToast('Error marking notification as read: ${e.toString()}');
+      String errorMessage = e.toString();
+      // Truncate very long error messages to prevent UI issues
+      if (errorMessage.length > 100) {
+        errorMessage = errorMessage.substring(0, 100) + '...';
+      }
+      _showErrorToast('Error marking notification as read: $errorMessage');
     }
   }
 
@@ -163,7 +168,12 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
         _showErrorToast('Failed to mark notification as unread: ${response['message']}');
       }
     } catch (e) {
-      _showErrorToast('Error marking notification as unread: ${e.toString()}');
+      String errorMessage = e.toString();
+      // Truncate very long error messages to prevent UI issues
+      if (errorMessage.length > 100) {
+        errorMessage = errorMessage.substring(0, 100) + '...';
+      }
+      _showErrorToast('Error marking notification as unread: $errorMessage');
     }
   }
 
@@ -240,16 +250,34 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
     }
 
     try {
-      final String googleMapsUrl = 'https://www.google.com/maps?q=$latitude,$longitude';
-      final Uri uri = Uri.parse(googleMapsUrl);
+      // Try multiple map services as fallback
+      final List<String> mapUrls = [
+        'https://www.google.com/maps?q=$latitude,$longitude',
+        'https://maps.google.com/maps?q=$latitude,$longitude',
+        'https://www.openstreetmap.org/?mlat=$latitude&mlon=$longitude&zoom=15',
+        'https://www.bing.com/maps?q=$latitude,$longitude',
+      ];
       
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        _showErrorToast('Could not open Google Maps');
+      bool launched = false;
+      for (String url in mapUrls) {
+        try {
+          final Uri uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            launched = true;
+            break;
+          }
+        } catch (e) {
+          debugPrint('Failed to launch $url: $e');
+          continue;
+        }
+      }
+      
+      if (!launched) {
+        _showErrorToast('Could not open any map service. Coordinates: $latitude, $longitude');
       }
     } catch (e) {
-      _showErrorToast('Error opening Google Maps: $e');
+      _showErrorToast('Error opening maps: $e');
     }
   }
 
@@ -468,18 +496,35 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
               // Notification Header
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: notification.isRead 
-                          ? Colors.grey.withOpacity(0.1)
-                          : AppColors.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.notifications,
-                      color: notification.isRead ? Colors.grey : AppColors.primaryColor,
-                    ),
+                  Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: notification.isRead 
+                              ? Colors.grey.withOpacity(0.1)
+                              : AppColors.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.notifications,
+                          color: notification.isRead ? Colors.grey : AppColors.primaryColor,
+                        ),
+                      ),
+                      if (!notification.isRead)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: const BoxDecoration(
+                              color: AppColors.errorColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(width: 12),
                   Expanded(

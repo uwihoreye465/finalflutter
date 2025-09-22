@@ -1214,7 +1214,7 @@ class ApiService {
   static Future<Map<String, dynamic>> markNotificationAsRead(int notificationId) async {
     try {
       final headers = await _getJsonHeaders();
-      final url = 'https://tracking-criminal.onrender.com/api/v1/notifications/$notificationId/read';
+      final url = _url('/notifications/$notificationId/read');
       debugPrint('Marking notification as read - URL: $url');
       debugPrint('Headers: $headers');
       debugPrint('Notification ID: $notificationId');
@@ -1239,23 +1239,57 @@ class ApiService {
     }
   }
 
+  // Delete victim-criminal record
+  static Future<Map<String, dynamic>> deleteVictimCriminalRecord(String recordId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final url = 'https://tracking-criminal.onrender.com/api/v1/victim-criminal/victims/$recordId';
+      debugPrint('Deleting victim-criminal record - URL: $url');
+      
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: headers,
+      );
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to delete record: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error in deleteVictimCriminalRecord: $e');
+      throw Exception('Error deleting record: $e');
+    }
+  }
+
   // Mark notification as unread
   static Future<Map<String, dynamic>> markNotificationAsUnread(int notificationId) async {
     try {
       final headers = await _getJsonHeaders();
-      final url = 'https://tracking-criminal.onrender.com/api/v1/notifications/$notificationId/read';
+      final url = _url('/notifications/$notificationId/read');
+      debugPrint('Marking notification as unread - URL: $url');
+      debugPrint('Headers: $headers');
+      debugPrint('Notification ID: $notificationId');
+      
       final response = await http.patch(
         Uri.parse(url),
         headers: headers,
         body: jsonEncode({'is_read': false}),
       );
 
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to mark notification as unread: ${response.statusCode}');
+        throw Exception('Failed to mark notification as unread: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
+      debugPrint('Error in markNotificationAsUnread: $e');
       throw Exception('Error marking notification as unread: $e');
     }
   }

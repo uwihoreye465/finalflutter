@@ -345,6 +345,10 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
           
           // Charts Section
           _buildChartsSection(),
+          const SizedBox(height: 24),
+          
+          // GPS Location Section
+          _buildGPSLocationSection(),
         ],
       ),
     );
@@ -449,107 +453,10 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         _buildArrestStatsChart(),
         const SizedBox(height: 24),
         
-        // Recent Records Tables
-        _buildRecentRecordsSection(),
       ],
     );
   }
 
-  Widget _buildRecentRecordsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Recent Records',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildRecentCriminalsTable(),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildRecentVictimsTable(),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecentCriminalsTable() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Recent Criminal Records',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            // This would be populated with actual data from API
-            Container(
-              height: 200,
-              child: ListView.builder(
-                itemCount: 5, // Show last 5 records
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.errorColor,
-                      child: Text('${index + 1}'),
-                    ),
-                    title: Text('Criminal ${index + 1}'),
-                    subtitle: Text('Crime Type: Theft'),
-                    trailing: Text('ID: ${1000 + index}'),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentVictimsTable() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Recent Victim Records',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            // This would be populated with actual data from API
-            Container(
-              height: 200,
-              child: ListView.builder(
-                itemCount: 5, // Show last 5 records
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.infoColor,
-                      child: Text('${index + 1}'),
-                    ),
-                    title: Text('Victim ${index + 1}'),
-                    subtitle: Text('Crime: Assault'),
-                    trailing: Text('ID: ${2000 + index}'),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildCrimeTypesChart() {
     if (_crimeTypeStats.isEmpty) {
@@ -831,5 +738,108 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
       AppColors.successColor,
     ];
     return colors[index % colors.length];
+  }
+
+  Widget _buildGPSLocationSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.location_on, color: AppColors.primaryColor),
+                const SizedBox(width: 8),
+                const Text(
+                  'GPS Location Tracking',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.map,
+                      size: 48,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Google Maps Integration',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Real-time location tracking will be displayed here',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // TODO: Implement GPS location functionality
+                        _showLocationDialog();
+                      },
+                      icon: const Icon(Icons.my_location),
+                      label: const Text('Get Current Location'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLocationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('GPS Location'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.location_on, size: 48, color: AppColors.primaryColor),
+            SizedBox(height: 16),
+            Text('GPS location tracking feature will be implemented here.'),
+            SizedBox(height: 8),
+            Text('This will show real-time location data from notifications and reports.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }

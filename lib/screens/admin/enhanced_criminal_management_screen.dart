@@ -296,6 +296,9 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
         _clearForm();
         _loadCriminalRecords(refresh: true);
         
+        // Close the dialog after successful operation
+        Navigator.of(context).pop();
+        
       } catch (e) {
         Fluttertoast.showToast(
           msg: 'Error ${_isEditMode ? 'updating' : 'adding'} criminal record: ${e.toString()}',

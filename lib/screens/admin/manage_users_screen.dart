@@ -35,6 +35,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   String _selectedRoleFilter = 'all';
   String _selectedApprovalFilter = 'all';
   List<User> _filteredUsers = [];
+  
 
   @override
   void initState() {
@@ -109,6 +110,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
         );
         _clearForm();
         _loadUsers();
+        Navigator.of(context).pop(); // Close the dialog
       } else {
         throw Exception(response['message'] ?? 'Failed to create user');
       }
@@ -234,6 +236,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       _selectedRole = user.role;
       _passwordController.clear();
     });
+    _showAddUserDialog();
   }
 
   void _clearForm() {
@@ -245,6 +248,105 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     _positionController.clear();
     _selectedRole = null;
     _editingUser = null;
+  }
+
+  void _showAddUserDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_editingUser == null ? 'Add New User' : 'Edit User'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CustomTextField(
+                  controller: _fullnameController,
+                  hintText: 'Full Name',
+                  labelText: 'Full Name',
+                  validator: Validators.validateRequired,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: _emailController,
+                  hintText: 'Email',
+                  labelText: 'Email',
+                  validator: Validators.validateEmail,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: _sectorController,
+                  hintText: 'Sector',
+                  labelText: 'Sector',
+                  validator: Validators.validateRequired,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: _positionController,
+                  hintText: 'Position',
+                  labelText: 'Position',
+                  validator: Validators.validateRequired,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: _passwordController,
+                  hintText: _editingUser == null ? 'Password' : 'New Password (optional)',
+                  labelText: _editingUser == null ? 'Password' : 'New Password (optional)',
+                  obscureText: true,
+                  validator: _editingUser == null 
+                      ? Validators.validateStrongPassword
+                      : (value) {
+                          if (value != null && value.isNotEmpty) {
+                            return Validators.validateStrongPassword(value);
+                          }
+                          return null;
+                        },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedRole,
+                  decoration: const InputDecoration(
+                    labelText: 'Role',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                    DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedRole = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select a role';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _clearForm();
+              Navigator.of(context).pop();
+            },
+            child: const Text('Cancel'),
+          ),
+          CustomButton(
+            text: _editingUser == null ? 'Add User' : 'Update User',
+            onPressed: _isSubmitting ? null : (_editingUser == null ? _addUser : _updateUser),
+            isLoading: _isSubmitting,
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _approveUser(User user) async {
@@ -299,6 +401,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     }
   }
 
+
   void _applyFilters() {
     setState(() {
       _filteredUsers = _users.where((user) {
@@ -314,156 +417,27 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          _clearForm();
+          _showAddUserDialog();
+        },
+        backgroundColor: AppColors.primaryColor,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add User'),
+      ),
       body: _isLoading
           ? const LoadingWidget()
           : Column(
               children: [
-                // Form Section
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey[300]!),
-                    ),
-                  ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        Text(
-                          _editingUser == null ? 'Add New User' : 'Edit User',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        Row(
-                          children: [
-                            Expanded(
-                              child: CustomTextField(
-                                controller: _fullnameController,
-                                hintText: 'Full Name',
-                                labelText: 'Full Name',
-                                validator: Validators.validateRequired,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: CustomTextField(
-                                controller: _emailController,
-                                hintText: 'Email',
-                                labelText: 'Email',
-                                validator: Validators.validateEmail,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        Row(
-                          children: [
-                            Expanded(
-                              child: CustomTextField(
-                                controller: _sectorController,
-                                hintText: 'Sector',
-                                labelText: 'Sector',
-                                validator: Validators.validateRequired,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: CustomTextField(
-                                controller: _positionController,
-                                hintText: 'Position',
-                                labelText: 'Position',
-                                validator: Validators.validateRequired,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        Row(
-                          children: [
-                            Expanded(
-                              child: CustomTextField(
-                                controller: _passwordController,
-                                hintText: _editingUser == null ? 'Password' : 'New Password (optional)',
-                                labelText: _editingUser == null ? 'Password' : 'New Password (optional)',
-                                obscureText: true,
-                                validator: _editingUser == null 
-                                    ? Validators.validateStrongPassword
-                                    : (value) {
-                                        if (value != null && value.isNotEmpty) {
-                                          return Validators.validateStrongPassword(value);
-                                        }
-                                        return null;
-                                      },
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedRole,
-                                decoration: const InputDecoration(
-                                  labelText: 'Role',
-                                  border: OutlineInputBorder(),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                                  DropdownMenuItem(value: 'staff', child: Text('Staff')),
-                                ],
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedRole = value;
-                                  });
-                                },
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please select a role';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        Row(
-                          children: [
-                            Expanded(
-                              child: CustomButton(
-                                text: _editingUser == null ? 'Add User' : 'Update User',
-                                onPressed: _editingUser == null ? _addUser : _updateUser,
-                                isLoading: _isSubmitting,
-                              ),
-                            ),
-                            if (_editingUser != null) ...[
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: CustomButton(
-                                  text: 'Cancel',
-                                  onPressed: _clearForm,
-                                  backgroundColor: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // Statistics Section
                 
                 // Filter Section
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: Colors.grey[50],
                     border: Border(
                       bottom: BorderSide(color: Colors.grey[300]!),
                     ),
@@ -476,18 +450,17 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Filter by Role',
                             border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
-                          items: [
-                            const DropdownMenuItem(value: 'all', child: Text('All Roles')),
-                            const DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                            const DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                          items: const [
+                            DropdownMenuItem(value: 'all', child: Text('All Roles')),
+                            DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                            DropdownMenuItem(value: 'staff', child: Text('Staff')),
                           ],
                           onChanged: (value) {
                             setState(() {
-                              _selectedRoleFilter = value ?? 'all';
+                              _selectedRoleFilter = value!;
+                              _applyFilters();
                             });
-                            _applyFilters();
                           },
                         ),
                       ),
@@ -498,18 +471,17 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Filter by Status',
                             border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
-                          items: [
-                            const DropdownMenuItem(value: 'all', child: Text('All Users')),
-                            const DropdownMenuItem(value: 'approved', child: Text('Approved')),
-                            const DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                          items: const [
+                            DropdownMenuItem(value: 'all', child: Text('All Users')),
+                            DropdownMenuItem(value: 'approved', child: Text('Approved')),
+                            DropdownMenuItem(value: 'pending', child: Text('Pending')),
                           ],
                           onChanged: (value) {
                             setState(() {
-                              _selectedApprovalFilter = value ?? 'all';
+                              _selectedApprovalFilter = value!;
+                              _applyFilters();
                             });
-                            _applyFilters();
                           },
                         ),
                       ),
@@ -528,9 +500,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: user.role == 'admin' 
-                                ? AppColors.errorColor 
-                                : AppColors.primaryColor,
+                            backgroundColor: AppColors.primaryColor,
                             child: Text(
                               user.fullname[0].toUpperCase(),
                               style: const TextStyle(
@@ -589,4 +559,5 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             ),
     );
   }
+
 }

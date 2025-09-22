@@ -124,6 +124,39 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
     }
   }
 
+  Future<void> _markAsUnread(int notificationId) async {
+    try {
+      final response = await ApiService.markNotificationAsUnread(notificationId);
+      if (response['success'] == true) {
+        setState(() {
+          final index = _notifications.indexWhere((n) => n.notId == notificationId);
+          if (index != -1) {
+            _notifications[index] = NotificationModel(
+              notId: _notifications[index].notId,
+              nearRib: _notifications[index].nearRib,
+              fullname: _notifications[index].fullname,
+              address: _notifications[index].address,
+              phone: _notifications[index].phone,
+              message: _notifications[index].message,
+              latitude: _notifications[index].latitude,
+              longitude: _notifications[index].longitude,
+              locationName: _notifications[index].locationName,
+              createdAt: _notifications[index].createdAt,
+              isRead: false, // Mark as unread
+            );
+            _totalUnread++;
+            _totalRead--;
+          }
+        });
+        _showSuccessToast('Notification marked as unread');
+      } else {
+        _showErrorToast('Failed to mark notification as unread: ${response['message']}');
+      }
+    } catch (e) {
+      _showErrorToast('Error marking notification as unread: ${e.toString()}');
+    }
+  }
+
   Future<void> _deleteNotification(int notificationId) async {
     try {
       await ApiService.deleteNotification(notificationId);
@@ -389,193 +422,209 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
   }
 
   Widget _buildNotificationCard(NotificationModel notification) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      onTap: () {
+        // Toggle read/unread status on tap
+        if (notification.notId != null) {
+          if (notification.isRead) {
+            _markAsUnread(notification.notId!);
+          } else {
+            _markAsRead(notification.notId!);
+          }
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: notification.isRead ? Colors.grey[50] : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(
+            color: notification.isRead ? Colors.grey.withOpacity(0.3) : AppColors.primaryColor.withOpacity(0.3),
+            width: 1,
           ),
-        ],
-        border: Border.all(
-          color: notification.isRead ? Colors.grey.withOpacity(0.3) : AppColors.primaryColor.withOpacity(0.3),
-          width: 1,
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Notification Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: notification.isRead 
-                        ? Colors.grey.withOpacity(0.1)
-                        : AppColors.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.notifications,
-                    color: notification.isRead ? Colors.grey : AppColors.primaryColor,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        notification.fullname,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'RIB: ${notification.nearRib}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!notification.isRead)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'NEW',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Message
-            Text(
-              notification.message,
-              style: const TextStyle(fontSize: 14),
-            ),
-            
-            const SizedBox(height: 8),
-            
-            // Address
-            Row(
-              children: [
-                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    notification.address,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 8),
-            
-            // Phone
-            Row(
-              children: [
-                Icon(Icons.phone, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Text(
-                  notification.phone,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-            
-            // GPS Location (if available)
-            if (notification.latitude != null && notification.longitude != null) ...[
-              const SizedBox(height: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Notification Header
               Row(
                 children: [
-                  Icon(Icons.gps_fixed, size: 16, color: Colors.grey[600]),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: notification.isRead 
+                          ? Colors.grey.withOpacity(0.1)
+                          : AppColors.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.notifications,
+                      color: notification.isRead ? Colors.grey : AppColors.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          notification.fullname,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'RIB: ${notification.nearRib}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!notification.isRead)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'NEW',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Message
+              Text(
+                notification.message,
+                style: const TextStyle(fontSize: 14),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              // Address
+              Row(
+                children: [
+                  Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'GPS: ${notification.latitude}, ${notification.longitude}',
+                      notification.address,
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
                       ),
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => _launchMaps(
-                      notification.latitude!,
-                      notification.longitude!,
+                ],
+              ),
+              
+              const SizedBox(height: 8),
+              
+              // Phone
+              Row(
+                children: [
+                  Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    notification.phone,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
                     ),
-                    child: const Text('View on Map'),
                   ),
                 ],
               ),
-            ],
-            
-            const SizedBox(height: 12),
-            
-            // Timestamp and Actions
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  notification.createdAt != null 
-                      ? DateFormat('yyyy-MM-dd HH:mm').format(notification.createdAt!)
-                      : 'Unknown',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                ),
+              
+              // GPS Location (if available)
+              if (notification.latitude != null && notification.longitude != null) ...[
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    if (!notification.isRead)
-                      IconButton(
-                        onPressed: () => notification.notId != null 
-                            ? _markAsRead(notification.notId!)
-                            : null,
-                        icon: const Icon(Icons.mark_email_read, color: AppColors.successColor),
-                        tooltip: 'Mark as Read',
+                    Icon(Icons.gps_fixed, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'GPS: ${notification.latitude}, ${notification.longitude}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
                       ),
-                    IconButton(
-                      onPressed: () => notification.notId != null 
-                          ? _deleteNotification(notification.notId!)
-                          : null,
-                      icon: const Icon(Icons.delete, color: AppColors.errorColor),
-                      tooltip: 'Delete',
+                    ),
+                    TextButton(
+                      onPressed: () => _launchMaps(
+                        notification.latitude!,
+                        notification.longitude!,
+                      ),
+                      child: const Text('View on Map'),
                     ),
                   ],
                 ),
               ],
-            ),
-          ],
+              
+              const SizedBox(height: 12),
+              
+              // Timestamp and Actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    notification.createdAt != null 
+                        ? DateFormat('yyyy-MM-dd HH:mm').format(notification.createdAt!)
+                        : 'Unknown',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => notification.notId != null 
+                            ? (notification.isRead 
+                                ? _markAsUnread(notification.notId!)
+                                : _markAsRead(notification.notId!))
+                            : null,
+                        icon: Icon(
+                          notification.isRead ? Icons.mark_email_unread : Icons.mark_email_read,
+                          color: notification.isRead ? AppColors.warningColor : AppColors.successColor,
+                        ),
+                        tooltip: notification.isRead ? 'Mark as Unread' : 'Mark as Read',
+                      ),
+                      IconButton(
+                        onPressed: () => notification.notId != null 
+                            ? _deleteNotification(notification.notId!)
+                            : null,
+                        icon: const Icon(Icons.delete, color: AppColors.errorColor),
+                        tooltip: 'Delete',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

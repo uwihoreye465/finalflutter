@@ -406,10 +406,23 @@ class ApiService {
   static Future<Map<String, dynamic>> updateCriminalRecord(int id, CriminalRecord record) async {
     try {
       final headers = await _getJsonHeaders();
+      
+      // Only send the fields that the API expects for updates
+      final updateData = {
+        'phone': record.phone,
+        'address_now': record.addressNow,
+        'crime_type': record.crimeType,
+        'description': record.description,
+        'date_committed': record.dateCommitted?.toIso8601String().split('T')[0],
+      };
+      
+      // Remove null values
+      updateData.removeWhere((key, value) => value == null);
+      
       final response = await http.put(
         Uri.parse(_url('/criminal-records/$id')),
         headers: headers,
-        body: jsonEncode(record.toJson(includeId: false)),
+        body: jsonEncode(updateData),
       );
 
       if (response.statusCode == 200) {
@@ -1085,7 +1098,7 @@ class ApiService {
   // Update user
   static Future<Map<String, dynamic>> updateUser(int userId, Map<String, dynamic> userData) async {
     try {
-      final headers = await _getAuthHeaders();
+      final headers = await _getJsonHeaders();
       final response = await http.put(
         Uri.parse(_url('/users/$userId')),
         headers: headers,
@@ -1095,7 +1108,7 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to update user: ${response.statusCode}');
+        throw Exception('Failed to update user: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       throw Exception('Error updating user: $e');
@@ -1200,20 +1213,162 @@ class ApiService {
   // Mark notification as read
   static Future<Map<String, dynamic>> markNotificationAsRead(int notificationId) async {
     try {
-      final headers = await _getAuthHeaders();
-      final response = await http.put(
-        Uri.parse(_url('/notifications/$notificationId/read')),
+      final headers = await _getJsonHeaders();
+      final url = 'https://tracking-criminal.onrender.com/api/v1/notifications/$notificationId/read';
+      debugPrint('Marking notification as read - URL: $url');
+      debugPrint('Headers: $headers');
+      debugPrint('Notification ID: $notificationId');
+      
+      final response = await http.patch(
+        Uri.parse(url),
         headers: headers,
         body: jsonEncode({'is_read': true}),
+      );
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to mark notification as read: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error in markNotificationAsRead: $e');
+      throw Exception('Error marking notification as read: $e');
+    }
+  }
+
+  // Mark notification as unread
+  static Future<Map<String, dynamic>> markNotificationAsUnread(int notificationId) async {
+    try {
+      final headers = await _getJsonHeaders();
+      final url = 'https://tracking-criminal.onrender.com/api/v1/notifications/$notificationId/read';
+      final response = await http.patch(
+        Uri.parse(url),
+        headers: headers,
+        body: jsonEncode({'is_read': false}),
       );
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to mark notification as read: ${response.statusCode}');
+        throw Exception('Failed to mark notification as unread: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error marking notification as read: $e');
+      throw Exception('Error marking notification as unread: $e');
+    }
+  }
+
+  // Download arrested criminal image
+  static Future<String> downloadArrestedCriminalImage(int arrestId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(_url('/arrested/$arrestId/download/image')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        // Return the image URL or handle the response as needed
+        final data = jsonDecode(response.body);
+        return data['imageUrl'] ?? data['url'] ?? '';
+      } else {
+        throw Exception('Failed to download image: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error downloading image: $e');
+    }
+  }
+
+  // Download victim evidence file
+  static Future<String> downloadVictimEvidence(int victimId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(_url('/victims/$victimId/download/evidence')),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        // Return the file URL or handle the response as needed
+        final data = jsonDecode(response.body);
+        return data['fileUrl'] ?? data['url'] ?? '';
+      } else {
+        throw Exception('Failed to download evidence: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error downloading evidence: $e');
+    }
+  }
+
+  // Get victims with criminal records
+  static Future<Map<String, dynamic>> getVictimsWithCriminalRecords() async {
+    try {
+      final headers = await _getAuthHeaders();
+      // Try the correct endpoint based on your API documentation
+      final response = await http.get(
+        Uri.parse('https://tracking-criminal.onrender.com/api/v1/victim-criminal/victims-with-criminal-records'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        // Fallback to getting victims and criminal records separately
+        final victimsResponse = await http.get(
+          Uri.parse(_url('/victims')),
+          headers: headers,
+        );
+        
+        final criminalsResponse = await http.get(
+          Uri.parse(_url('/criminal-records')),
+          headers: headers,
+        );
+
+        if (victimsResponse.statusCode == 200 && criminalsResponse.statusCode == 200) {
+          final victimsData = jsonDecode(victimsResponse.body);
+          final criminalsData = jsonDecode(criminalsResponse.body);
+          
+          // Combine the data manually
+          return {
+            'success': true,
+            'data': victimsData['victims'] ?? [],
+            'criminals': criminalsData['criminalRecords'] ?? [],
+          };
+        } else {
+          throw Exception('Failed to get victims with criminal records: ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      throw Exception('Error getting victims with criminal records: $e');
+    }
+  }
+
+  // Upload file for victim evidence
+  static Future<Map<String, dynamic>> uploadFile(File file, String type, int recordId) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse(_url('/upload')),
+      );
+      
+      request.headers.addAll(headers);
+      request.fields['type'] = type;
+      request.fields['record_id'] = recordId.toString();
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        return jsonDecode(responseBody);
+      } else {
+        throw Exception('Failed to upload file: ${response.statusCode} - $responseBody');
+      }
+    } catch (e) {
+      throw Exception('Error uploading file: $e');
     }
   }
 

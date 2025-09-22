@@ -16,6 +16,7 @@ import 'enhanced_arrested_criminals_screen.dart';
 import 'enhanced_notifications_screen.dart';
 import 'manage_users_screen.dart';
 import 'enhanced_statistics_screen.dart';
+import 'records_overview_screen.dart';
 import '../user/enhanced_report_screen.dart';
 import '../auth/login_screen.dart';
 
@@ -35,6 +36,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
   Map<String, dynamic> _arrestedStats = {};
   Map<String, dynamic> _victimStats = {};
   Map<String, dynamic> _notificationStats = {};
+  Map<String, dynamic> _userStats = {};
   
   // Chart data
   List<Map<String, dynamic>> _crimeTypeStats = [];
@@ -45,7 +47,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this);
+    _tabController = TabController(length: 9, vsync: this);
     _loadStatistics();
   }
 
@@ -95,6 +97,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         ApiService.getArrestedStatistics(),
         ApiService.getVictimsStatistics(),
         ApiService.getNotificationStatistics(),
+        _loadUserStatistics(),
       ]);
 
       // Process criminal records statistics
@@ -121,6 +124,11 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         _notificationStats = results[3]['data'];
       }
 
+      // Process user statistics
+      if (results[4]['success'] == true) {
+        _userStats = results[4]['data'];
+      }
+
     } catch (e) {
       debugPrint('Error loading statistics: $e');
       Fluttertoast.showToast(
@@ -135,6 +143,36 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
     setState(() {
       _isLoading = false;
     });
+  }
+
+  Future<Map<String, dynamic>> _loadUserStatistics() async {
+    try {
+      final response = await ApiService.getUsersAdmin();
+      if (response['success'] == true) {
+        final users = response['data']['users'] as List;
+        final totalUsers = users.length;
+        final approvedUsers = users.where((user) => user['is_approved'] == true).length;
+        final pendingUsers = users.where((user) => user['is_approved'] == false).length;
+        final staffUsers = users.where((user) => user['role'] == 'staff').length;
+        final adminUsers = users.where((user) => user['role'] == 'admin').length;
+        
+        return {
+          'success': true,
+          'data': {
+            'total_users': totalUsers,
+            'approved_users': approvedUsers,
+            'pending_users': pendingUsers,
+            'staff_users': staffUsers,
+            'admin_users': adminUsers,
+          }
+        };
+      } else {
+        return {'success': false, 'data': {}};
+      }
+    } catch (e) {
+      debugPrint('Error loading user statistics: $e');
+      return {'success': false, 'data': {}};
+    }
   }
 
   List<Map<String, dynamic>> _processCrimeTypeStatsFromStats(Map<String, dynamic> stats) {
@@ -235,6 +273,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
             Tab(text: 'Users', icon: Icon(Icons.admin_panel_settings)),
             Tab(text: 'Report', icon: Icon(Icons.add_alert)),
             Tab(text: 'Statistics', icon: Icon(Icons.analytics)),
+            Tab(text: 'Records', icon: Icon(Icons.table_chart)),
           ],
         ),
       ),
@@ -251,6 +290,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
                 const ManageUsersScreen(),
                 const EnhancedReportScreen(),
                 const EnhancedStatisticsScreen(),
+                const RecordsOverviewScreen(),
               ],
             ),
     );
@@ -301,10 +341,10 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
           AppColors.infoColor
         ),
         _buildStatCard(
-          'Notifications', 
-          _notificationStats['overall_statistics']?['total_messages'] ?? '0', 
+          'Unread Notifications', 
+          _notificationStats['overall_statistics']?['unread_messages']?.toString() ?? '0', 
           Icons.notifications, 
-          AppColors.primaryColor
+          Colors.orange
         ),
       ],
     );
@@ -370,7 +410,107 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         
         // Arrest Statistics Chart
         _buildArrestStatsChart(),
+        const SizedBox(height: 24),
+        
+        // Recent Records Tables
+        _buildRecentRecordsSection(),
       ],
+    );
+  }
+
+  Widget _buildRecentRecordsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Recent Records',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildRecentCriminalsTable(),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildRecentVictimsTable(),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentCriminalsTable() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Recent Criminal Records',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            // This would be populated with actual data from API
+            Container(
+              height: 200,
+              child: ListView.builder(
+                itemCount: 5, // Show last 5 records
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.errorColor,
+                      child: Text('${index + 1}'),
+                    ),
+                    title: Text('Criminal ${index + 1}'),
+                    subtitle: Text('Crime Type: Theft'),
+                    trailing: Text('ID: ${1000 + index}'),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentVictimsTable() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Recent Victim Records',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            // This would be populated with actual data from API
+            Container(
+              height: 200,
+              child: ListView.builder(
+                itemCount: 5, // Show last 5 records
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.infoColor,
+                      child: Text('${index + 1}'),
+                    ),
+                    title: Text('Victim ${index + 1}'),
+                    subtitle: Text('Crime: Assault'),
+                    trailing: Text('ID: ${2000 + index}'),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

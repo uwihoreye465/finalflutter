@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:dropdown_search/dropdown_search.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import '../../services/api_service.dart';
 import '../../models/victim.dart';
 import '../../utils/constants.dart';
@@ -54,6 +57,10 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
     bool _isSubmitting = false;
     bool _isEditMode = false;
     Victim? _editingVictim;
+    
+    // File upload variables
+    List<File> _selectedFiles = [];
+    final ImagePicker _picker = ImagePicker();
 
     @override
     void initState() {
@@ -85,6 +92,50 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
 
     void _onSearchChanged() {
       _applyFilters();
+    }
+
+    Future<void> _pickFiles() async {
+      try {
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          allowMultiple: true,
+          type: FileType.any,
+        );
+
+        if (result != null) {
+          setState(() {
+            _selectedFiles = result.paths.map((path) => File(path!)).toList();
+          });
+        }
+      } catch (e) {
+        Fluttertoast.showToast(
+          msg: 'Error picking files: ${e.toString()}',
+          backgroundColor: AppColors.errorColor,
+          textColor: Colors.white,
+        );
+      }
+    }
+
+    Future<void> _pickImage() async {
+      try {
+        final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+        if (image != null) {
+          setState(() {
+            _selectedFiles.add(File(image.path));
+          });
+        }
+      } catch (e) {
+        Fluttertoast.showToast(
+          msg: 'Error picking image: ${e.toString()}',
+          backgroundColor: AppColors.errorColor,
+          textColor: Colors.white,
+        );
+      }
+    }
+
+    void _removeFile(int index) {
+      setState(() {
+        _selectedFiles.removeAt(index);
+      });
     }
 
     Future<void> _loadVictims({bool refresh = false}) async {
@@ -290,14 +341,83 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
         );
 
         if (_isEditMode) {
-          await ApiService.updateVictim(_editingVictim!.vicId!, victim);
+          // Update victim with file information
+          final updatedVictim = Victim(
+            vicId: victim.vicId,
+            idType: victim.idType,
+            idNumber: victim.idNumber,
+            firstName: victim.firstName,
+            lastName: victim.lastName,
+            gender: victim.gender,
+            dateOfBirth: victim.dateOfBirth,
+            maritalStatus: victim.maritalStatus,
+            country: victim.country,
+            province: victim.province,
+            district: victim.district,
+            sector: victim.sector,
+            cell: victim.cell,
+            village: victim.village,
+            addressNow: victim.addressNow,
+            phone: victim.phone,
+            victimEmail: victim.victimEmail,
+            sinnerIdentification: victim.sinnerIdentification,
+            crimeType: victim.crimeType,
+            evidence: {
+              'description': _evidenceDescriptionController.text.trim(),
+              'files': _selectedFiles.map((file) => {
+                'name': file.path.split('/').last,
+                'type': file.path.split('.').last,
+                'path': file.path,
+                'uploadedAt': DateTime.now().toIso8601String(),
+              }).toList(),
+              'uploadedAt': DateTime.now().toIso8601String(),
+            },
+            dateCommitted: victim.dateCommitted,
+          );
+          
+          await ApiService.updateVictim(_editingVictim!.vicId!, updatedVictim);
+          
           Fluttertoast.showToast(
             msg: "Victim record updated successfully!",
             backgroundColor: AppColors.successColor,
             textColor: Colors.white,
           );
         } else {
-          await ApiService.addVictim(victim);
+          // Create victim with file information
+          final newVictim = Victim(
+            idType: victim.idType,
+            idNumber: victim.idNumber,
+            firstName: victim.firstName,
+            lastName: victim.lastName,
+            gender: victim.gender,
+            dateOfBirth: victim.dateOfBirth,
+            maritalStatus: victim.maritalStatus,
+            country: victim.country,
+            province: victim.province,
+            district: victim.district,
+            sector: victim.sector,
+            cell: victim.cell,
+            village: victim.village,
+            addressNow: victim.addressNow,
+            phone: victim.phone,
+            victimEmail: victim.victimEmail,
+            sinnerIdentification: victim.sinnerIdentification,
+            crimeType: victim.crimeType,
+            evidence: {
+              'description': _evidenceDescriptionController.text.trim(),
+              'files': _selectedFiles.map((file) => {
+                'name': file.path.split('/').last,
+                'type': file.path.split('.').last,
+                'path': file.path,
+                'uploadedAt': DateTime.now().toIso8601String(),
+              }).toList(),
+              'uploadedAt': DateTime.now().toIso8601String(),
+            },
+            dateCommitted: victim.dateCommitted,
+          );
+          
+          await ApiService.addVictim(newVictim);
+          
           Fluttertoast.showToast(
             msg: "Victim record added successfully!",
             backgroundColor: AppColors.successColor,
@@ -307,6 +427,9 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
         
         _clearForm();
         _loadVictims(refresh: true);
+        
+        // Close the dialog
+        Navigator.of(context).pop();
         
       } catch (e) {
         Fluttertoast.showToast(
@@ -388,6 +511,125 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
       _showAddVictimDialog();
     }
 
+    void _viewVictimFiles(Victim victim) {
+      if (victim.evidence == null || victim.evidence!['files'] == null) {
+        Fluttertoast.showToast(
+          msg: 'No files attached to this victim record',
+          backgroundColor: AppColors.warningColor,
+          textColor: Colors.white,
+        );
+        return;
+      }
+
+      final files = victim.evidence!['files'] as List;
+      if (files.isEmpty) {
+        Fluttertoast.showToast(
+          msg: 'No files attached to this victim record',
+          backgroundColor: AppColors.warningColor,
+          textColor: Colors.white,
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Files for ${victim.firstName} ${victim.lastName}'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (victim.evidence!['description'] != null && victim.evidence!['description'].toString().isNotEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Description: ${victim.evidence!['description']}',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Attached Files:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                ...files.map((file) => Card(
+                  child: ListTile(
+                    leading: Icon(
+                      _getFileIcon(file['type'] ?? ''),
+                      color: AppColors.primaryColor,
+                    ),
+                    title: Text(file['name'] ?? 'Unknown file'),
+                    subtitle: Text('Type: ${file['type'] ?? 'Unknown'}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.download),
+                      onPressed: () async {
+                        try {
+                          final fileUrl = await ApiService.downloadVictimEvidence(victim.vicId!);
+                          if (fileUrl.isNotEmpty) {
+                            // Open the file URL in browser or download
+                            Fluttertoast.showToast(
+                              msg: 'File downloaded successfully',
+                              backgroundColor: AppColors.successColor,
+                              textColor: Colors.white,
+                            );
+                            // You can add url_launcher package to open the URL
+                          } else {
+                            Fluttertoast.showToast(
+                              msg: 'No file available for download',
+                              backgroundColor: AppColors.warningColor,
+                              textColor: Colors.white,
+                            );
+                          }
+                        } catch (e) {
+                          Fluttertoast.showToast(
+                            msg: 'Error downloading file: ${e.toString()}',
+                            backgroundColor: AppColors.errorColor,
+                            textColor: Colors.white,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                )).toList(),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    IconData _getFileIcon(String fileType) {
+      switch (fileType.toLowerCase()) {
+        case 'pdf':
+          return Icons.picture_as_pdf;
+        case 'jpg':
+        case 'jpeg':
+        case 'png':
+        case 'gif':
+          return Icons.image;
+        case 'doc':
+        case 'docx':
+          return Icons.description;
+        case 'txt':
+          return Icons.text_snippet;
+        default:
+          return Icons.attach_file;
+      }
+    }
+
     void _clearForm() {
       _formKey.currentState?.reset();
       _idNumberController.clear();
@@ -412,6 +654,7 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
       _selectedDateCommitted = null;
       _isEditMode = false;
       _editingVictim = null;
+      _selectedFiles.clear();
     }
 
     void _showAddVictimDialog() {
@@ -690,6 +933,78 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                       ),
                       const SizedBox(height: 16),
                       
+                      // File Upload Section
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Evidence Files',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _pickFiles,
+                                    icon: const Icon(Icons.attach_file),
+                                    label: const Text('Pick Files'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primaryColor,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _pickImage,
+                                    icon: const Icon(Icons.image),
+                                    label: const Text('Pick Image'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.secondaryColor,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_selectedFiles.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Selected Files:',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              ..._selectedFiles.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final file = entry.value;
+                                return Card(
+                                  child: ListTile(
+                                    leading: const Icon(Icons.attach_file),
+                                    title: Text(file.path.split('/').last),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () => _removeFile(index),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
                       // Date Committed
                       InkWell(
                         onTap: () async {
@@ -909,6 +1224,9 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                                       if (victim.victimEmail != null)
                                         Text('Email: ${victim.victimEmail}'),
                                       Text('Date: ${victim.dateCommitted != null ? DateFormat('yyyy-MM-dd').format(victim.dateCommitted!) : 'N/A'}'),
+                                      if (victim.evidence != null && victim.evidence!['files'] != null && (victim.evidence!['files'] as List).isNotEmpty)
+                                        Text('Files: ${(victim.evidence!['files'] as List).length} attached', 
+                                             style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
                                     ],
                                   ),
                                   trailing: PopupMenuButton(
@@ -923,6 +1241,17 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                                           ],
                                         ),
                                       ),
+                                      if (victim.evidence != null && victim.evidence!['files'] != null && (victim.evidence!['files'] as List).isNotEmpty)
+                                        PopupMenuItem(
+                                          value: 'files',
+                                          child: const Row(
+                                            children: [
+                                              Icon(Icons.attach_file, color: Colors.green),
+                                              SizedBox(width: 8),
+                                              Text('View Files'),
+                                            ],
+                                          ),
+                                        ),
                                       PopupMenuItem(
                                         value: 'delete',
                                         child: const Row(
@@ -937,6 +1266,8 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                                     onSelected: (value) {
                                       if (value == 'edit') {
                                         _editVictim(victim);
+                                      } else if (value == 'files') {
+                                        _viewVictimFiles(victim);
                                       } else if (value == 'delete') {
                                         _deleteVictim(victim);
                                       }

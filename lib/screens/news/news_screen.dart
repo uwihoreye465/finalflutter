@@ -54,22 +54,36 @@ class _NewsScreenState extends State<NewsScreen> {
         if (dataMap['records'] != null && dataMap['records'] is List) {
           final records = dataMap['records'] as List;
           newCriminals = records.map((record) {
-            // Extract only essential fields for news display
-            return ArrestedCriminal(
-              arrestId: record['arrest_id'] ?? 0,
-              fullname: record['fullname'] ?? 'Unknown',
-              imageUrl: record['image_url'],
-              crimeType: record['crime_type'] ?? 'Unknown Crime',
-              dateArrested: record['date_arrested'] != null 
-                  ? DateTime.parse(record['date_arrested'])
-                  : DateTime.now(),
-              arrestLocation: record['arrest_location'],
-              idType: record['id_type'],
-              idNumber: record['id_number'],
-              criminalRecordId: record['criminal_record_id'],
-              arrestingOfficerId: record['arresting_officer_id'],
-            );
-          }).toList();
+            try {
+              // Ensure record is a Map<String, dynamic>
+              Map<String, dynamic> recordMap;
+              if (record is Map<String, dynamic>) {
+                recordMap = record;
+              } else {
+                recordMap = Map<String, dynamic>.from(record);
+              }
+              
+              // Extract only essential fields for news display
+              return ArrestedCriminal(
+                arrestId: recordMap['arrest_id'] ?? 0,
+                fullname: recordMap['fullname']?.toString() ?? 'Unknown',
+                imageUrl: recordMap['image_url']?.toString(),
+                crimeType: recordMap['crime_type']?.toString() ?? 'Unknown Crime',
+                dateArrested: recordMap['date_arrested'] != null 
+                    ? DateTime.parse(recordMap['date_arrested'].toString())
+                    : DateTime.now(),
+                arrestLocation: recordMap['arrest_location']?.toString(),
+                idType: recordMap['id_type']?.toString(),
+                idNumber: recordMap['id_number']?.toString(),
+                criminalRecordId: recordMap['criminal_record_id'],
+                arrestingOfficerId: recordMap['arresting_officer_id'],
+              );
+            } catch (e) {
+              debugPrint('Error parsing arrested criminal record: $e');
+              debugPrint('Record data: $record');
+              return null;
+            }
+          }).where((criminal) => criminal != null).cast<ArrestedCriminal>().toList();
         }
       }
 

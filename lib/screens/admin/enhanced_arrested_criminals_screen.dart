@@ -71,7 +71,37 @@ class _EnhancedArrestedCriminalsScreenState extends State<EnhancedArrestedCrimin
       if (response['success'] == true) {
         final List<dynamic> records = response['data']['records'] ?? [];
         final List<ArrestedCriminal> arrestedCriminals = records
-            .map((json) => ArrestedCriminal.fromJson(json))
+            .map((json) {
+              try {
+                // Handle the case where json might be a Map<String, dynamic> or already parsed
+                Map<String, dynamic> jsonMap;
+                if (json is Map<String, dynamic>) {
+                  jsonMap = json;
+                } else {
+                  jsonMap = Map<String, dynamic>.from(json);
+                }
+                
+                // Handle image_url which might be a Buffer object
+                if (jsonMap['image_url'] != null && jsonMap['image_url'] is Map) {
+                  final imageData = jsonMap['image_url'] as Map<String, dynamic>;
+                  if (imageData['type'] == 'Buffer' && imageData['data'] != null) {
+                    // Convert buffer data to string
+                    final bufferData = imageData['data'] as List<int>;
+                    final imageString = String.fromCharCodes(bufferData);
+                    jsonMap['image_url'] = imageString;
+                  }
+                }
+                
+                return ArrestedCriminal.fromJson(jsonMap);
+              } catch (e) {
+                debugPrint('Error parsing arrested criminal: $e');
+                debugPrint('JSON data: $json');
+                debugPrint('JSON type: ${json.runtimeType}');
+                return null;
+              }
+            })
+            .where((criminal) => criminal != null)
+            .cast<ArrestedCriminal>()
             .toList();
 
         setState(() {

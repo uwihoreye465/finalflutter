@@ -510,15 +510,16 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
                 PieChartData(
                   sections: _crimeTypeStats.take(5).map((stat) {
                     final color = _getColorForIndex(_crimeTypeStats.indexOf(stat));
+                    final count = stat['count'] as int;
                     return PieChartSectionData(
                       color: color,
-                      value: stat['count'].toDouble(),
-                      title: '${stat['type']}\n${stat['count']}',
+                      value: count.toDouble(),
+                      title: '${stat['type']}\n${count}',
                       radius: 60,
-                      titleStyle: const TextStyle(
-                        fontSize: 10,
+                      titleStyle: TextStyle(
+                        fontSize: count > 5 ? 12 : 10,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: count > 5 ? Colors.red : Colors.white,
                       ),
                     );
                   }).toList(),
@@ -527,6 +528,42 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            // Legend with counts
+            ..._crimeTypeStats.take(5).map((stat) {
+              final count = stat['count'] as int;
+              final color = _getColorForIndex(_crimeTypeStats.indexOf(stat));
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        stat['type'],
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    Text(
+                      count.toString(),
+                      style: TextStyle(
+                        fontSize: count > 5 ? 16 : 14,
+                        fontWeight: FontWeight.bold,
+                        color: count > 5 ? Colors.red : Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ],
         ),
       ),

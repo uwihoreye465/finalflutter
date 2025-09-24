@@ -87,7 +87,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
 
   Future<void> _logout() async {
     try {
-      await AuthService.logout();
+      await AuthService().logout();
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,

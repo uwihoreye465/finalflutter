@@ -47,11 +47,37 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
     String? _selectedIdType;
     String? _selectedGender;
     String? _selectedMaritalStatus;
+    String? _selectedCrimeType;
     DateTime? _selectedDateOfBirth;
     DateTime? _selectedDateCommitted;
     bool _isSubmitting = false;
     bool _isEditMode = false;
     CriminalRecord? _editingRecord;
+
+    // Crime types list
+    final List<String> _crimeTypes = [
+      'Theft',
+      'Assault',
+      'Battery',
+      'Robbery',
+      'Burglary',
+      'Fraud',
+      'Drug Possession',
+      'Drug Trafficking',
+      'Domestic Violence',
+      'Sexual Assault',
+      'Murder',
+      'Manslaughter',
+      'Kidnapping',
+      'Arson',
+      'Vandalism',
+      'Trespassing',
+      'Embezzlement',
+      'Money Laundering',
+      'Cyber Crime',
+      'Terrorism',
+      'Other'
+    ];
 
     @override
     void initState() {
@@ -272,7 +298,7 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
           village: _selectedIdType == 'passport' ? null : (_villageController.text.trim().isEmpty ? null : _villageController.text.trim()),
           addressNow: _addressNowController.text.trim(),
           phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-          crimeType: _crimeTypeController.text.trim(),
+          crimeType: _selectedCrimeType ?? '',
           description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
           dateCommitted: _selectedDateCommitted!,
         );
@@ -369,7 +395,7 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
         _villageController.text = record.village ?? '';
         _addressNowController.text = record.addressNow ?? '';
         _phoneController.text = record.phone ?? '';
-        _crimeTypeController.text = record.crimeType;
+        _selectedCrimeType = record.crimeType;
         _descriptionController.text = record.description ?? '';
         _selectedDateCommitted = record.dateCommitted;
       });
@@ -390,11 +416,11 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
       _villageController.clear();
       _addressNowController.clear();
       _phoneController.clear();
-      _crimeTypeController.clear();
       _descriptionController.clear();
       _selectedIdType = null;
       _selectedGender = null;
       _selectedMaritalStatus = null;
+      _selectedCrimeType = null;
       _selectedDateOfBirth = null;
       _selectedDateCommitted = null;
       _isEditMode = false;
@@ -637,13 +663,26 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
                       const SizedBox(height: 16),
                       
                       // Crime Type
-                      CustomTextField(
-                        controller: _crimeTypeController,
-                        hintText: 'Enter Crime Type',
-                        label: 'Crime Type *',
+                      DropdownButtonFormField<String>(
+                        value: _selectedCrimeType,
+                        decoration: const InputDecoration(
+                          labelText: 'Crime Type *',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _crimeTypes.map((String crimeType) {
+                          return DropdownMenuItem<String>(
+                            value: crimeType,
+                            child: Text(crimeType),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedCrimeType = newValue;
+                          });
+                        },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter crime type';
+                            return 'Please select crime type';
                           }
                           return null;
                         },

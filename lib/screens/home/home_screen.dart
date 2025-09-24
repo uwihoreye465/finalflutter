@@ -12,6 +12,7 @@ import '../../widgets/common_footer.dart';
 import '../auth/login_screen.dart';
 import '../user/enhanced_report_screen.dart';
 import '../admin/admin_dashboard.dart';
+import '../admin/rib_station_dashboard.dart';
 import '../search/search_result_screen.dart';
 import '../news/news_screen.dart';
 
@@ -179,11 +180,45 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showNotificationForm(CriminalRecord criminalRecord) {
     final _formKey = GlobalKey<FormState>();
-    final _nearRibController = TextEditingController();
+    String? _selectedRibStation;
     final _fullnameController = TextEditingController();
     final _addressController = TextEditingController();
     final _phoneController = TextEditingController();
     final _messageController = TextEditingController();
+    
+    // List of all RIB stations
+    final List<String> ribStations = [
+      'Bugesera STATIONS',
+      'Gatsibo STATIONS',
+      'Kayonza STATIONS',
+      'Kirehe STATIONS',
+      'Ngoma STATIONS',
+      'Nyagatare STATIONS',
+      'Rwamagana STATIONS',
+      'Gasabo STATIONS',
+      'Kicukiro STATIONS',
+      'Nyarugenge STATIONS',
+      'Burera STATIONS',
+      'Gakenke STATIONS',
+      'Gicumbi STATIONS',
+      'Musanze STATIONS',
+      'Rulindo STATIONS',
+      'Gisagara STATIONS',
+      'Huye STATIONS',
+      'Kamonyi STATIONS',
+      'Muhanga STATIONS',
+      'Nyamagabe STATIONS',
+      'Nyanza STATIONS',
+      'Nyaruguru STATIONS',
+      'Ruhango STATIONS',
+      'Karongi STATIONS',
+      'Ngororero STATIONS',
+      'Nyabihu STATIONS',
+      'Nyamasheke STATIONS',
+      'Rubavu STATIONS',
+      'Rusizi STATIONS',
+      'Rutsiro STATIONS',
+    ];
 
     showDialog(
       context: context,
@@ -195,15 +230,24 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: _nearRibController,
+                DropdownButtonFormField<String>(
+                  value: _selectedRibStation,
                   decoration: const InputDecoration(
-                    labelText: 'Near RIB Office',
+                    labelText: 'Select RIB Station',
                     border: OutlineInputBorder(),
                   ),
+                  items: ribStations.map((String station) {
+                    return DropdownMenuItem<String>(
+                      value: station,
+                      child: Text(station),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    _selectedRibStation = newValue;
+                  },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter RIB office location';
+                      return 'Please select a RIB station';
                     }
                     return null;
                   },
@@ -279,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (_formKey.currentState!.validate()) {
                 try {
                   final notificationData = {
-                    'near_rib': _nearRibController.text.trim(),
+                    'near_rib': _selectedRibStation ?? '',
                     'fullname': _fullnameController.text.trim(),
                     'address': _addressController.text.trim(),
                     'phone': _phoneController.text.trim(),
@@ -323,12 +367,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     bool isLoggedIn = false;
     bool isAdmin = false;
+    bool isNearRib = false;
     AuthService? authService;
 
     try {
       authService = Provider.of<AuthService>(context, listen: false);
       isLoggedIn = authService.isAuthenticated;
       isAdmin = authService.user?.role == 'admin';
+      isNearRib = authService.user?.role == 'near_rib';
     } catch (e) {
       debugPrint('Auth service not available: $e');
     }
@@ -364,11 +410,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: const Icon(Icons.more_vert, color: Colors.white),
                         onSelected: (value) {
                           if (value == 'logout') {
-                            AuthService.logout();
+                            AuthService().logout();
                           } else if (value == 'admin' && isAdmin) {
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => const AdminDashboard()),
+                            );
+                          } else if (value == 'rib_station' && isNearRib) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const RibStationDashboard()),
                             );
                           }
                         },
@@ -380,6 +431,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               const PopupMenuItem<String>(
                                 value: 'admin',
                                 child: Text('Admin Dashboard'),
+                              ),
+                            );
+                          }
+
+                          if (isNearRib) {
+                            items.add(
+                              const PopupMenuItem<String>(
+                                value: 'rib_station',
+                                child: Text('RIB Station Dashboard'),
                               ),
                             );
                           }

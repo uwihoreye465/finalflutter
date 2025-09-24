@@ -46,10 +46,18 @@ class AuthService with ChangeNotifier {
       
       if (response['success'] == true || response['token'] != null) {
         // Handle different response structures
-        if (response['user'] != null) {
+        if (response['data'] != null && response['data']['user'] != null) {
+          // New API structure: {success: true, data: {user: {...}, tokens: {...}}}
+          _user = User.fromJson(response['data']['user']);
+          _token = response['data']['tokens']?['accessToken'] ?? response['data']['token'];
+        } else if (response['user'] != null) {
+          // Old API structure: {success: true, user: {...}, token: "..."}
           _user = User.fromJson(response['user']);
+          _token = response['token'];
         } else if (response['data'] != null) {
+          // Direct data structure: {success: true, data: {...}}
           _user = User.fromJson(response['data']);
+          _token = response['token'];
         } else {
           // If no user object, create one from available data
           _user = User(
@@ -61,9 +69,9 @@ class AuthService with ChangeNotifier {
             position: response['position'] ?? '',
             isVerified: response['is_verified'] ?? false,
           );
+          _token = response['token'];
         }
         
-        _token = response['token'];
         _isAuthenticated = true;
         
         // Save to local storage
@@ -97,11 +105,19 @@ class AuthService with ChangeNotifier {
     }
   }
 
-  static Future<void> logout() async {
+  Future<void> logout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user');
       await prefs.remove('token');
+      
+      // Clear instance state
+      _user = null;
+      _token = null;
+      _isAuthenticated = false;
+      _isLoading = false;
+      
+      notifyListeners();
     } catch (e) {
       debugPrint('Error during logout: $e');
     }

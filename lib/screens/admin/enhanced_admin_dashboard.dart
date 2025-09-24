@@ -53,7 +53,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
 
   Future<void> _logout() async {
     try {
-      await AuthService.logout();
+      await AuthService().logout();
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,

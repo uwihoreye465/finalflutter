@@ -324,6 +324,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                   items: const [
                     DropdownMenuItem(value: 'admin', child: Text('Admin')),
                     DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                    DropdownMenuItem(value: 'near_rib', child: Text('RIB Station Officer')),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -456,6 +457,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                             DropdownMenuItem(value: 'all', child: Text('All Roles')),
                             DropdownMenuItem(value: 'admin', child: Text('Admin')),
                             DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                            DropdownMenuItem(value: 'near_rib', child: Text('RIB Station Officer')),
                           ],
                           onChanged: (value) {
                             setState(() {

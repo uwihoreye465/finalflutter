@@ -3,6 +3,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cross_file/cross_file.dart';
+import 'dart:io';
 import '../../services/api_service.dart';
 import '../../models/arrested_criminal.dart';
 import '../../utils/constants.dart';
@@ -33,11 +34,37 @@ class _EnhancedArrestedCriminalsScreenState extends State<EnhancedArrestedCrimin
   final _idNumberController = TextEditingController();
   
   String? _selectedIdType;
+  String? _selectedCrimeType;
   DateTime? _selectedDateArrested;
   bool _isSubmitting = false;
   XFile? _selectedImage;
   final ImagePicker _picker = ImagePicker();
   ArrestedCriminal? _editingArrested;
+
+  // Crime types list
+  final List<String> _crimeTypes = [
+    'Theft',
+    'Assault',
+    'Battery',
+    'Robbery',
+    'Burglary',
+    'Fraud',
+    'Drug Possession',
+    'Drug Trafficking',
+    'Domestic Violence',
+    'Sexual Assault',
+    'Murder',
+    'Manslaughter',
+    'Kidnapping',
+    'Arson',
+    'Vandalism',
+    'Trespassing',
+    'Embezzlement',
+    'Money Laundering',
+    'Cyber Crime',
+    'Terrorism',
+    'Other'
+  ];
 
   @override
   void initState() {
@@ -201,10 +228,10 @@ class _EnhancedArrestedCriminalsScreenState extends State<EnhancedArrestedCrimin
 
   void _clearForm() {
     _fullnameController.clear();
-    _crimeTypeController.clear();
     _arrestLocationController.clear();
     _idNumberController.clear();
     _selectedIdType = null;
+    _selectedCrimeType = null;
     _selectedDateArrested = null;
     _selectedImage = null;
     _editingArrested = null;
@@ -240,11 +267,31 @@ class _EnhancedArrestedCriminalsScreenState extends State<EnhancedArrestedCrimin
     });
 
     try {
+      // Upload image first if selected
+      String? uploadedImageUrl;
+      if (_selectedImage != null) {
+        try {
+          debugPrint('Uploading image: ${_selectedImage!.path}');
+          uploadedImageUrl = await ApiService.uploadImage(File(_selectedImage!.path));
+          debugPrint('Image uploaded successfully: $uploadedImageUrl');
+        } catch (e) {
+          debugPrint('Error uploading image: $e');
+          Fluttertoast.showToast(
+            msg: 'Image upload failed: $e',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: AppColors.warningColor,
+            textColor: Colors.white,
+          );
+          // Continue without image if upload fails
+        }
+      }
+
       final arrestedCriminal = ArrestedCriminal(
         arrestId: null,
         fullname: _fullnameController.text.trim(),
-        imageUrl: _selectedImage?.path,
-        crimeType: _crimeTypeController.text.trim(),
+        imageUrl: uploadedImageUrl,
+        crimeType: _selectedCrimeType ?? '',
         dateArrested: _selectedDateArrested!,
         arrestLocation: _arrestLocationController.text.trim(),
         idType: _selectedIdType,
@@ -316,11 +363,22 @@ class _EnhancedArrestedCriminalsScreenState extends State<EnhancedArrestedCrimin
     });
 
     try {
+      // Upload new image if selected, otherwise keep existing
+      String? imageUrl = _editingArrested!.imageUrl;
+      if (_selectedImage != null) {
+        try {
+          imageUrl = await ApiService.uploadImage(File(_selectedImage!.path));
+        } catch (e) {
+          debugPrint('Error uploading image: $e');
+          // Keep existing image if upload fails
+        }
+      }
+
       final arrestedCriminal = ArrestedCriminal(
         arrestId: _editingArrested!.arrestId,
         fullname: _fullnameController.text.trim(),
-        imageUrl: _selectedImage?.path ?? _editingArrested!.imageUrl,
-        crimeType: _crimeTypeController.text.trim(),
+        imageUrl: imageUrl,
+        crimeType: _selectedCrimeType ?? '',
         dateArrested: _selectedDateArrested!,
         arrestLocation: _arrestLocationController.text.trim(),
         idType: _selectedIdType,
@@ -422,7 +480,7 @@ class _EnhancedArrestedCriminalsScreenState extends State<EnhancedArrestedCrimin
   void _showEditArrestedDialog(ArrestedCriminal arrested) {
     _editingArrested = arrested;
     _fullnameController.text = arrested.fullname ?? '';
-    _crimeTypeController.text = arrested.crimeType ?? '';
+    _selectedCrimeType = arrested.crimeType;
     _arrestLocationController.text = arrested.arrestLocation ?? '';
     _idNumberController.text = arrested.idNumber ?? '';
     _selectedIdType = arrested.idType;
@@ -456,13 +514,28 @@ class _EnhancedArrestedCriminalsScreenState extends State<EnhancedArrestedCrimin
                   ),
                   const SizedBox(height: 16),
                   
-                  CustomTextField(
-                    controller: _crimeTypeController,
-                    labelText: 'Crime Type *',
-                    hintText: 'Enter crime type',
+                  DropdownButtonFormField<String>(
+                    value: _selectedCrimeType != null && _crimeTypes.contains(_selectedCrimeType) 
+                        ? _selectedCrimeType 
+                        : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Crime Type *',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _crimeTypes.map((String crimeType) {
+                      return DropdownMenuItem<String>(
+                        value: crimeType,
+                        child: Text(crimeType),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedCrimeType = newValue;
+                      });
+                    },
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter crime type';
+                      if (value == null || value.isEmpty) {
+                        return 'Please select crime type';
                       }
                       return null;
                     },

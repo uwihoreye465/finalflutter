@@ -12,6 +12,7 @@ import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import '../home/home_screen.dart';
 import '../admin/admin_dashboard.dart';
+import '../admin/rib_station_dashboard.dart';
 import '../user/enhanced_report_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -54,6 +55,12 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const AdminDashboard()),
+          );
+        } else if (userRole == 'near_rib') {
+          // For near_rib role, go to RIB Station Dashboard
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const RibStationDashboard()),
           );
         } else {
           // For staff or other roles, go to report screen

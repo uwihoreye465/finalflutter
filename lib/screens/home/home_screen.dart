@@ -8,7 +8,7 @@ import '../../utils/constants.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/common_header.dart';
-import '../../widgets/common_footer.dart';
+import '../../widgets/beautiful_footer.dart';
 import '../auth/login_screen.dart';
 import '../user/enhanced_report_screen.dart';
 import '../admin/admin_dashboard.dart';
@@ -577,47 +577,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               
-              // Bottom Navigation
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildBottomNavItem(
-                      icon: Icons.home,
-                      label: 'Home',
-                      isSelected: true,
-                      onTap: () {},
-                    ),
-                    _buildBottomNavItem(
-                      icon: Icons.person,
-                      label: 'Login',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const LoginScreen()),
-                        );
-                      },
-                    ),
-                    _buildBottomNavItem(
-                      icon: Icons.newspaper,
-                      label: 'News',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NewsScreen()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+              // Beautiful Footer
+              BeautifulFooter(
+                currentIndex: 0,
+                onTap: (index) {
+                  switch (index) {
+                    case 0:
+                      // Already on home screen
+                      break;
+                    case 1:
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      );
+                      break;
+                    case 2:
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NewsScreen()),
+                      );
+                      break;
+                  }
+                },
               ),
             ],
           ),
@@ -626,35 +607,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBottomNavItem({
-    required IconData icon,
-    required String label,
-    bool isSelected = false,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppColors.primaryColor : Colors.grey,
-            size: 28,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? AppColors.primaryColor : Colors.grey,
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   void dispose() {

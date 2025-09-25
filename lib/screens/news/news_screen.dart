@@ -4,6 +4,9 @@ import '../../services/api_service.dart';
 import '../../models/arrested_criminal.dart';
 import '../../utils/constants.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/beautiful_footer.dart';
+import '../home/home_screen.dart';
+import '../auth/login_screen.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -297,6 +300,28 @@ class _NewsScreenState extends State<NewsScreen> {
                         ),
                       ),
           ),
+                BeautifulFooter(
+                  currentIndex: 2,
+                  onTap: (index) {
+                    switch (index) {
+                      case 0:
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HomeScreen()),
+                        );
+                        break;
+                      case 1:
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        );
+                        break;
+                      case 2:
+                        // Already on news screen
+                        break;
+                    }
+                  },
+                ),
         ],
       ),
     );

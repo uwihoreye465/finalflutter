@@ -1251,7 +1251,11 @@ class ApiService {
       final response = await http.patch(
         Uri.parse(url),
         headers: headers,
-        body: jsonEncode({'is_read': true}),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout - API server may be slow');
+        },
       );
 
       debugPrint('Response status: ${response.statusCode}');
@@ -1268,16 +1272,23 @@ class ApiService {
     }
   }
 
-  // Delete victim-criminal record
-  static Future<Map<String, dynamic>> deleteVictimCriminalRecord(String recordId) async {
+  static Future<Map<String, dynamic>> markMultipleNotificationsAsRead(List<int> notificationIds) async {
     try {
-      final headers = await _getAuthHeaders();
-      final url = 'https://tracking-criminal.onrender.com/api/v1/victim-criminal/victims/$recordId';
-      debugPrint('Deleting victim-criminal record - URL: $url');
+      final headers = await _getJsonHeaders();
+      final url = _url('/notifications/mark-multiple-read');
+      debugPrint('Marking multiple notifications as read - URL: $url');
+      debugPrint('Headers: $headers');
+      debugPrint('Notification IDs: $notificationIds');
       
-      final response = await http.delete(
+      final response = await http.patch(
         Uri.parse(url),
         headers: headers,
+        body: jsonEncode({'notificationIds': notificationIds}),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout - API server may be slow');
+        },
       );
 
       debugPrint('Response status: ${response.statusCode}');
@@ -1286,11 +1297,282 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Failed to delete record: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to mark multiple notifications as read: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error in markMultipleNotificationsAsRead: $e');
+      throw Exception('Error marking multiple notifications as read: $e');
+    }
+  }
+
+  // Delete victim/criminal record
+  static Future<Map<String, dynamic>> deleteVictimCriminalRecord(int recordId) async {
+    try {
+      final headers = await _getJsonHeaders();
+      final url = _url('/victim-criminal/victims/$recordId');
+      debugPrint('Deleting victim/criminal record - URL: $url');
+      debugPrint('Headers: $headers');
+      debugPrint('Record ID: $recordId');
+      
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: headers,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout - API server may be slow');
+        },
+      );
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to delete victim/criminal record: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       debugPrint('Error in deleteVictimCriminalRecord: $e');
-      throw Exception('Error deleting record: $e');
+      throw Exception('Error deleting victim/criminal record: $e');
+    }
+  }
+
+  // Toggle notification read status
+  static Future<Map<String, dynamic>> toggleNotificationRead(int notificationId) async {
+    try {
+      final headers = await _getJsonHeaders();
+      
+      // First try the toggle-read endpoint
+      try {
+        final url = _url('/notifications/$notificationId/toggle-read');
+        debugPrint('Trying toggle-read endpoint - URL: $url');
+        
+        final response = await http.patch(
+          Uri.parse(url),
+          headers: headers,
+          body: jsonEncode({}),
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout - API server may be slow');
+          },
+        );
+
+        debugPrint('Toggle-read response status: ${response.statusCode}');
+        debugPrint('Toggle-read response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body);
+          if (result['success'] == true && result['data'] != null) {
+            return result;
+          }
+        }
+      } catch (toggleError) {
+        debugPrint('Toggle-read endpoint failed: $toggleError');
+      }
+      
+      // Fallback: Try to get current notification status and toggle it
+      try {
+        final getUrl = _url('/notifications/$notificationId');
+        debugPrint('Getting notification status - URL: $getUrl');
+        
+        final getResponse = await http.get(
+          Uri.parse(getUrl),
+          headers: headers,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout - API server may be slow');
+          },
+        );
+
+        if (getResponse.statusCode == 200) {
+          final notificationData = jsonDecode(getResponse.body);
+          final isCurrentlyRead = notificationData['data']?['is_read'] ?? false;
+          final newStatus = !isCurrentlyRead;
+          
+          // Now mark as read or unread based on current status
+          if (newStatus) {
+            return await markNotificationAsRead(notificationId);
+          } else {
+            return await markNotificationAsUnread(notificationId);
+          }
+        }
+      } catch (getError) {
+        debugPrint('Get notification status failed: $getError');
+      }
+      
+      // Final fallback: Assume it's currently unread and mark as read
+      debugPrint('All methods failed, marking as read as fallback');
+      return await markNotificationAsRead(notificationId);
+      
+    } catch (e) {
+      debugPrint('Error in toggleNotificationRead: $e');
+      throw Exception('Error toggling notification read status: $e');
+    }
+  }
+
+
+  // Mark notification as read for RIB dashboard (specific endpoint)
+  static Future<Map<String, dynamic>> markNotificationAsReadRib(int notificationId) async {
+    try {
+      // Try with auth headers first
+      try {
+        final headers = await _getAuthHeaders();
+        final url = _url('/notifications/$notificationId/read');
+        debugPrint('Marking notification as read (RIB) - URL: $url');
+        debugPrint('Headers: $headers');
+        debugPrint('Notification ID: $notificationId');
+        
+        final response = await http.patch(
+          Uri.parse(url),
+          headers: headers,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout - API server may be slow');
+          },
+        );
+
+        debugPrint('Response status: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body);
+          return {
+            'success': true,
+            'message': 'Notification marked as read successfully',
+            'data': {
+              'new_status': true,
+              'notification_id': notificationId,
+            }
+          };
+        } else if (response.statusCode == 401) {
+          throw Exception('Authentication failed - please login again');
+        } else {
+          throw Exception('API Error ${response.statusCode}: ${response.body}');
+        }
+      } catch (authError) {
+        debugPrint('Auth headers failed, trying JSON headers: $authError');
+        
+        // Fallback to JSON headers
+        final headers = await _getJsonHeaders();
+        final url = _url('/notifications/$notificationId/read');
+        debugPrint('Trying with JSON headers - URL: $url');
+        debugPrint('Headers: $headers');
+        
+        final response = await http.patch(
+          Uri.parse(url),
+          headers: headers,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout - API server may be slow');
+          },
+        );
+
+        debugPrint('JSON Headers Response status: ${response.statusCode}');
+        debugPrint('JSON Headers Response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body);
+          return {
+            'success': true,
+            'message': 'Notification marked as read successfully',
+            'data': {
+              'new_status': true,
+              'notification_id': notificationId,
+            }
+          };
+        } else {
+          throw Exception('API Error ${response.statusCode}: ${response.body}');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in markNotificationAsReadRib: $e');
+      throw Exception('Error marking notification as read: $e');
+    }
+  }
+
+  // Mark notification as unread for RIB dashboard
+  static Future<Map<String, dynamic>> markNotificationAsUnreadRib(int notificationId) async {
+    try {
+      // Try with auth headers first
+      try {
+        final headers = await _getAuthHeaders();
+        final url = _url('/notifications/$notificationId/unread');
+        debugPrint('Marking notification as unread (RIB) - URL: $url');
+        debugPrint('Headers: $headers');
+        debugPrint('Notification ID: $notificationId');
+        
+        final response = await http.patch(
+          Uri.parse(url),
+          headers: headers,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout - API server may be slow');
+          },
+        );
+
+        debugPrint('Response status: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body);
+          return {
+            'success': true,
+            'message': 'Notification marked as unread successfully',
+            'data': {
+              'new_status': false,
+              'notification_id': notificationId,
+            }
+          };
+        } else if (response.statusCode == 401) {
+          throw Exception('Authentication failed - please login again');
+        } else {
+          throw Exception('API Error ${response.statusCode}: ${response.body}');
+        }
+      } catch (authError) {
+        debugPrint('Auth headers failed, trying JSON headers: $authError');
+        
+        // Fallback to JSON headers
+        final headers = await _getJsonHeaders();
+        final url = _url('/notifications/$notificationId/unread');
+        debugPrint('Trying with JSON headers - URL: $url');
+        debugPrint('Headers: $headers');
+        
+        final response = await http.patch(
+          Uri.parse(url),
+          headers: headers,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timeout - API server may be slow');
+          },
+        );
+
+        debugPrint('JSON Headers Response status: ${response.statusCode}');
+        debugPrint('JSON Headers Response body: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body);
+          return {
+            'success': true,
+            'message': 'Notification marked as unread successfully',
+            'data': {
+              'new_status': false,
+              'notification_id': notificationId,
+            }
+          };
+        } else {
+          throw Exception('API Error ${response.statusCode}: ${response.body}');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in markNotificationAsUnreadRib: $e');
+      throw Exception('Error marking notification as unread: $e');
     }
   }
 
@@ -1298,7 +1580,7 @@ class ApiService {
   static Future<Map<String, dynamic>> markNotificationAsUnread(int notificationId) async {
     try {
       final headers = await _getJsonHeaders();
-      final url = _url('/notifications/$notificationId/read');
+      final url = _url('/notifications/$notificationId/unread');
       debugPrint('Marking notification as unread - URL: $url');
       debugPrint('Headers: $headers');
       debugPrint('Notification ID: $notificationId');
@@ -1306,7 +1588,11 @@ class ApiService {
       final response = await http.patch(
         Uri.parse(url),
         headers: headers,
-        body: jsonEncode({'is_read': false}),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Request timeout - API server may be slow');
+        },
       );
 
       debugPrint('Response status: ${response.statusCode}');

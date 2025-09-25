@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../utils/constants.dart';
@@ -6,7 +7,9 @@ import '../../widgets/loading_widget.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 class RibAssignedNotificationsScreen extends StatefulWidget {
-  const RibAssignedNotificationsScreen({super.key});
+  final VoidCallback? onNotificationChanged;
+  
+  const RibAssignedNotificationsScreen({super.key, this.onNotificationChanged});
 
   @override
   State<RibAssignedNotificationsScreen> createState() => _RibAssignedNotificationsScreenState();
@@ -34,7 +37,8 @@ class _RibAssignedNotificationsScreenState extends State<RibAssignedNotification
 
   Future<void> _loadUserInfo() async {
     try {
-      final authService = AuthService();
+      // Use Provider to get the AuthService instance
+      final authService = Provider.of<AuthService>(context, listen: false);
       final user = authService.user;
       debugPrint('Auth service user for notifications: $user');
       debugPrint('Auth service isAuthenticated: ${authService.isAuthenticated}');
@@ -49,16 +53,17 @@ class _RibAssignedNotificationsScreenState extends State<RibAssignedNotification
         debugPrint('User sector: ${user.sector}');
         debugPrint('User role: ${user.role}');
       } else {
-        debugPrint('No user found in auth service for notifications');
-        // Try to wait a bit and check again
-        await Future.delayed(const Duration(milliseconds: 100));
-        final user2 = authService.user;
-        debugPrint('Second attempt - Auth service user: $user2');
-        if (user2 != null) {
+        debugPrint('No user found in auth service for notifications, trying to reload...');
+        // Try to reload from storage
+        await authService.loadUserFromStorage();
+        final reloadedUser = authService.user;
+        if (reloadedUser != null) {
           setState(() {
-            _userId = user2.userId;
+            _userId = reloadedUser.userId;
           });
-          debugPrint('User ID loaded on second attempt: $_userId');
+          debugPrint('User reloaded for notifications: $_userId');
+        } else {
+          debugPrint('Still no user found after reload for notifications');
         }
       }
     } catch (e) {
@@ -145,7 +150,9 @@ class _RibAssignedNotificationsScreenState extends State<RibAssignedNotification
 
   Future<void> _markAsRead(int notificationId) async {
     try {
-      final response = await ApiService.markNotificationAsRead(notificationId);
+      // Use the RIB-specific API endpoint
+      debugPrint('Marking notification $notificationId as read (RIB)');
+      final response = await ApiService.markNotificationAsReadRib(notificationId);
       
       if (response['success'] == true) {
         setState(() {
@@ -159,30 +166,64 @@ class _RibAssignedNotificationsScreenState extends State<RibAssignedNotification
         });
         
         Fluttertoast.showToast(
-          msg: 'Notification marked as read',
+          msg: '✅ Notification marked as read successfully',
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.successColor,
           textColor: Colors.white,
         );
+        
+        // Notify parent to refresh statistics
+        widget.onNotificationChanged?.call();
+        
+        // Also reload the notifications to get updated data
+        await _loadNotifications();
       } else {
-        throw Exception(response['message'] ?? 'Failed to mark as read');
+        throw Exception('API returned error: ${response['message']}');
       }
+      
     } catch (e) {
       debugPrint('Error marking as read: $e');
+      
+      // Update UI optimistically even if API fails
+      setState(() {
+        for (int i = 0; i < _notifications.length; i++) {
+          if (_notifications[i]['not_id'] == notificationId) {
+            _notifications[i]['is_read'] = true;
+            break;
+          }
+        }
+        _applyFilter();
+      });
+      
+      String errorMessage = '❌ Failed to update notification. Please check your connection and try again.';
+      
+      if (e.toString().contains('Authentication failed')) {
+        errorMessage = '🔐 Authentication failed. Please login again.';
+      } else if (e.toString().contains('timeout')) {
+        errorMessage = '⏱️ Request timeout. Please try again.';
+      } else if (e.toString().contains('API Error')) {
+        errorMessage = '🔧 Server error. Please try again later.';
+      }
+      
       Fluttertoast.showToast(
-        msg: 'Error: $e',
-        toastLength: Toast.LENGTH_SHORT,
+        msg: errorMessage,
+        toastLength: Toast.LENGTH_LONG,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.errorColor,
         textColor: Colors.white,
       );
+      
+      // Notify parent to refresh statistics
+      widget.onNotificationChanged?.call();
     }
   }
 
   Future<void> _markAsUnread(int notificationId) async {
     try {
-      final response = await ApiService.markNotificationAsUnread(notificationId);
+      // Use the RIB-specific API endpoint
+      debugPrint('Marking notification $notificationId as unread (RIB)');
+      final response = await ApiService.markNotificationAsUnreadRib(notificationId);
       
       if (response['success'] == true) {
         setState(() {
@@ -196,24 +237,56 @@ class _RibAssignedNotificationsScreenState extends State<RibAssignedNotification
         });
         
         Fluttertoast.showToast(
-          msg: 'Notification marked as unread',
+          msg: '📝 Notification marked as unread successfully',
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: AppColors.warningColor,
           textColor: Colors.white,
         );
+        
+        // Notify parent to refresh statistics
+        widget.onNotificationChanged?.call();
+        
+        // Also reload the notifications to get updated data
+        await _loadNotifications();
       } else {
-        throw Exception(response['message'] ?? 'Failed to mark as unread');
+        throw Exception('API returned error: ${response['message']}');
       }
+      
     } catch (e) {
       debugPrint('Error marking as unread: $e');
+      
+      // Update UI optimistically even if API fails
+      setState(() {
+        for (int i = 0; i < _notifications.length; i++) {
+          if (_notifications[i]['not_id'] == notificationId) {
+            _notifications[i]['is_read'] = false;
+            break;
+          }
+        }
+        _applyFilter();
+      });
+      
+      String errorMessage = '❌ Failed to update notification. Please check your connection and try again.';
+      
+      if (e.toString().contains('Authentication failed')) {
+        errorMessage = '🔐 Authentication failed. Please login again.';
+      } else if (e.toString().contains('timeout')) {
+        errorMessage = '⏱️ Request timeout. Please try again.';
+      } else if (e.toString().contains('API Error')) {
+        errorMessage = '🔧 Server error. Please try again later.';
+      }
+      
       Fluttertoast.showToast(
-        msg: 'Error: $e',
-        toastLength: Toast.LENGTH_SHORT,
+        msg: errorMessage,
+        toastLength: Toast.LENGTH_LONG,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: AppColors.errorColor,
         textColor: Colors.white,
       );
+      
+      // Notify parent to refresh statistics
+      widget.onNotificationChanged?.call();
     }
   }
 

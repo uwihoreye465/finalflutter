@@ -979,7 +979,7 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
   }
 
   Widget _buildNotificationStats() {
-    final overallStats = _notificationStats['overall_statistics'] as Map<String, dynamic>? ?? {};
+    final overallStats = _notificationStats['overall_stats'] as Map<String, dynamic>? ?? {};
     
     return Card(
       child: Padding(
@@ -992,11 +992,11 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            _buildStatRow('Total Messages', overallStats['total_messages']?.toString() ?? '0'),
-            _buildStatRow('Unread Messages', overallStats['total_unread']?.toString() ?? '0'),
-            _buildStatRow('Read Messages', overallStats['total_read']?.toString() ?? '0'),
-            _buildStatRow('Messages with GPS', overallStats['total_with_gps']?.toString() ?? '0'),
-            _buildStatRow('Total RIBs', overallStats['total_ribs']?.toString() ?? '0'),
+            _buildStatRow('Total Messages', overallStats['total_notifications']?.toString() ?? '0'),
+            _buildStatRow('Unread Messages', overallStats['assigned_unread_notifications']?.toString() ?? '0'),
+            _buildStatRow('Read Messages', overallStats['assigned_read_notifications']?.toString() ?? '0'),
+            _buildStatRow('Assigned Messages', overallStats['assigned_notifications']?.toString() ?? '0'),
+            _buildStatRow('Unassigned Messages', overallStats['unassigned_notifications']?.toString() ?? '0'),
           ],
         ),
       ),
@@ -1004,9 +1004,9 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
   }
 
   Widget _buildRibStatistics() {
-    final ribStats = _notificationStats['rib_statistics'] as List? ?? [];
+    final sectorStats = _notificationStats['sector_stats'] as List? ?? [];
     
-    if (ribStats.isEmpty) {
+    if (sectorStats.isEmpty) {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(32),
@@ -1028,14 +1028,14 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            ...ribStats.take(10).map((rib) => _buildRibItem(rib)),
+            ...sectorStats.take(10).map((sector) => _buildRibItem(sector)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRibItem(Map<String, dynamic> rib) {
+  Widget _buildRibItem(Map<String, dynamic> sector) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -1045,18 +1045,18 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  rib['near_rib'] ?? 'Unknown RIB',
+                  sector['sector'] ?? 'Unknown RIB',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '${rib['total_messages']} messages (${rib['unread_messages']} unread)',
+                  '${sector['total_notifications']} messages (${sector['assigned_unread']} unread)',
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
               ],
             ),
           ),
           Text(
-            '${rib['messages_with_gps']} GPS',
+            '${sector['assigned_notifications']} Assigned',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ],

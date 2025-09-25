@@ -17,10 +17,10 @@ class AuthService with ChangeNotifier {
   bool get isLoading => _isLoading;
 
   AuthService() {
-    _loadUserFromStorage();
+    loadUserFromStorage();
   }
 
-  Future<void> _loadUserFromStorage() async {
+  Future<void> loadUserFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userData = prefs.getString('user');

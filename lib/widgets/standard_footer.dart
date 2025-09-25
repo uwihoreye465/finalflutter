@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
+import '../screens/auth/login_screen.dart';
+import '../screens/news/news_screen.dart';
 
-class CommonFooter extends StatelessWidget {
-  final int currentIndex;
-  final Function(int) onTap;
+class StandardFooter extends StatelessWidget {
+  final int selectedIndex;
+  final Function(int)? onItemTapped;
 
-  const CommonFooter({
+  const StandardFooter({
     super.key,
-    required this.currentIndex,
-    required this.onTap,
+    this.selectedIndex = 0,
+    this.onItemTapped,
   });
 
   @override
@@ -27,23 +29,26 @@ class CommonFooter extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildFooterItem(
+            _buildBottomNavItem(
+              context: context,
               icon: Icons.home,
               label: 'Home',
               index: 0,
-              isSelected: currentIndex == 0,
+              isSelected: selectedIndex == 0,
             ),
-            _buildFooterItem(
+            _buildBottomNavItem(
+              context: context,
               icon: Icons.person,
               label: 'Login',
               index: 1,
-              isSelected: currentIndex == 1,
+              isSelected: selectedIndex == 1,
             ),
-            _buildFooterItem(
+            _buildBottomNavItem(
+              context: context,
               icon: Icons.newspaper,
               label: 'News',
               index: 2,
-              isSelected: currentIndex == 2,
+              isSelected: selectedIndex == 2,
             ),
           ],
         ),
@@ -51,14 +56,21 @@ class CommonFooter extends StatelessWidget {
     );
   }
 
-  Widget _buildFooterItem({
+  Widget _buildBottomNavItem({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required int index,
-    required bool isSelected,
+    bool isSelected = false,
   }) {
     return GestureDetector(
-      onTap: () => onTap(index),
+      onTap: () {
+        if (onItemTapped != null) {
+          onItemTapped!(index);
+        } else {
+          _handleDefaultNavigation(context, index);
+        }
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -79,5 +91,25 @@ class CommonFooter extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _handleDefaultNavigation(BuildContext context, int index) {
+    switch (index) {
+      case 0:
+        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+        break;
+      case 1:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+        break;
+      case 2:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const NewsScreen()),
+        );
+        break;
+    }
   }
 }

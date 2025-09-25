@@ -122,6 +122,50 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
       // Process notifications statistics
       if (results[3]['success'] == true) {
         _notificationStats = results[3]['data'];
+        debugPrint('Notification stats loaded: $_notificationStats');
+        debugPrint('Overall stats: ${_notificationStats['overall_stats']}');
+        debugPrint('Overall statistics: ${_notificationStats['overall_statistics']}');
+      } else {
+        debugPrint('Failed to load notification stats: ${results[3]}');
+      }
+      
+      // Always try to load notifications directly as additional data source
+      try {
+        final directResponse = await ApiService.getNotificationsAdmin();
+        debugPrint('Direct notifications response: $directResponse');
+        
+        if (directResponse['success'] == true) {
+          List<dynamic> notifications;
+          if (directResponse['data'] is List) {
+            notifications = directResponse['data'] as List;
+          } else if (directResponse['data']['notifications'] != null) {
+            notifications = directResponse['data']['notifications'] as List;
+          } else {
+            notifications = [];
+          }
+          
+          debugPrint('Found ${notifications.length} notifications');
+          final unreadCount = notifications.where((n) => n['is_read'] == false).length;
+          final readCount = notifications.where((n) => n['is_read'] == true).length;
+          debugPrint('Unread: $unreadCount, Read: $readCount');
+          
+          // Update notification stats with direct data
+          _notificationStats = {
+            'overall_statistics': {
+              'total_notifications': notifications.length,
+              'unread_notifications': unreadCount,
+              'read_notifications': readCount,
+            },
+            'overall_stats': {
+              'total_notifications': notifications.length,
+              'unread_notifications': unreadCount,
+              'read_notifications': readCount,
+            }
+          };
+          debugPrint('Updated notification stats with direct data: $_notificationStats');
+        }
+      } catch (e) {
+        debugPrint('Direct notification loading failed: $e');
       }
 
       // Process user statistics
@@ -177,33 +221,57 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
 
   Future<Map<String, dynamic>> _loadNotificationStats() async {
     try {
-      final response = await ApiService.getNotificationsAdmin();
+      // First try the assignment statistics API
+      final response = await ApiService.getNotificationAssignmentStatistics();
+      debugPrint('Admin notification assignment stats response: $response');
+      
       if (response['success'] == true) {
-        // Handle both direct array and nested notifications structure
-        List<dynamic> notifications;
-        if (response['data'] is List) {
-          notifications = response['data'] as List;
-        } else if (response['data']['notifications'] != null) {
-          notifications = response['data']['notifications'] as List;
-        } else {
-          notifications = [];
-        }
+        final data = response['data'];
+        final overallStats = data['overall_stats'] as Map<String, dynamic>? ?? {};
         
-        final totalNotifications = notifications.length;
-        final unreadNotifications = notifications.where((notification) => notification['is_read'] == false).length;
-        final readNotifications = notifications.where((notification) => notification['is_read'] == true).length;
+        debugPrint('Overall stats: $overallStats');
 
         return {
           'success': true,
           'data': {
             'overall_statistics': {
-              'total_messages': totalNotifications,
-              'unread_messages': unreadNotifications,
-              'read_messages': readNotifications,
+              'total_messages': overallStats['total_notifications'] ?? 0,
+              'unread_messages': overallStats['assigned_unread_notifications'] ?? 0,
+              'read_messages': overallStats['assigned_read_notifications'] ?? 0,
+              'assigned_messages': overallStats['assigned_notifications'] ?? 0,
+              'unassigned_messages': overallStats['unassigned_notifications'] ?? 0,
             }
           }
         };
       } else {
+        debugPrint('Assignment stats failed, trying regular notifications API...');
+        // Fallback to regular notifications API
+        final fallbackResponse = await ApiService.getNotificationsAdmin();
+        if (fallbackResponse['success'] == true) {
+          List<dynamic> notifications;
+          if (fallbackResponse['data'] is List) {
+            notifications = fallbackResponse['data'] as List;
+          } else if (fallbackResponse['data']['notifications'] != null) {
+            notifications = fallbackResponse['data']['notifications'] as List;
+          } else {
+            notifications = [];
+          }
+          
+          final totalNotifications = notifications.length;
+          final unreadNotifications = notifications.where((notification) => notification['is_read'] == false).length;
+          final readNotifications = notifications.where((notification) => notification['is_read'] == true).length;
+
+          return {
+            'success': true,
+            'data': {
+              'overall_statistics': {
+                'total_messages': totalNotifications,
+                'unread_messages': unreadNotifications,
+                'read_messages': readNotifications,
+              }
+            }
+          };
+        }
         return {'success': false, 'data': {}};
       }
     } catch (e) {
@@ -359,9 +427,9 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.5,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
+      childAspectRatio: 0.9,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
       children: [
         _buildStatCard(
           'Total Criminals', 
@@ -383,7 +451,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         ),
         _buildStatCard(
           'Unread Notifications', 
-          _notificationStats['overall_statistics']?['unread_messages']?.toString() ?? '0', 
+          _getUnreadNotificationCount(), 
           Icons.notifications, 
           Colors.orange
         ),
@@ -391,15 +459,88 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
     );
   }
 
+  String _getUnreadNotificationCount() {
+    // Try multiple possible field names and data structures
+    final overallStats = _notificationStats['overall_statistics'] as Map<String, dynamic>? ?? {};
+    final overallStatsAlt = _notificationStats['overall_stats'] as Map<String, dynamic>? ?? {};
+    
+    // Try different field names
+    String? count;
+    
+    // Try overall_statistics first
+    count = overallStats['unread_notifications']?.toString();
+    if (count != null && count != '0') return count;
+    
+    count = overallStats['assigned_unread_notifications']?.toString();
+    if (count != null && count != '0') return count;
+    
+    count = overallStats['unread_messages']?.toString();
+    if (count != null && count != '0') return count;
+    
+    // Try overall_stats
+    count = overallStatsAlt['unread_notifications']?.toString();
+    if (count != null && count != '0') return count;
+    
+    count = overallStatsAlt['assigned_unread_notifications']?.toString();
+    if (count != null && count != '0') return count;
+    
+    count = overallStatsAlt['unread_messages']?.toString();
+    if (count != null && count != '0') return count;
+    
+    // If all else fails, return 0
+    debugPrint('Could not find unread notification count in: $_notificationStats');
+    return '0';
+  }
+
   Widget _buildStatCard(String title, String count, IconData icon, Color color) {
+    // Define background colors for different card types
+    Color backgroundColor;
+    Color textColor = Colors.white;
+    
+    if (title == 'Total Criminals') {
+      backgroundColor = Colors.red.shade50;
+      textColor = Colors.red.shade800;
+    } else if (title == 'Arrested') {
+      backgroundColor = Colors.orange.shade50;
+      textColor = Colors.orange.shade800;
+    } else if (title == 'Victims') {
+      backgroundColor = Colors.blue.shade50;
+      textColor = Colors.blue.shade800;
+    } else if (title == 'Unread Notifications') {
+      backgroundColor = Colors.purple.shade50;
+      textColor = Colors.purple.shade800;
+    } else {
+      backgroundColor = Colors.grey.shade50;
+      textColor = Colors.grey.shade800;
+    }
+    
     return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        height: 120,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              backgroundColor,
+              backgroundColor.withOpacity(0.7),
+            ],
+          ),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 32, color: color),
+            Icon(icon, size: 28, color: color),
             const SizedBox(height: 8),
             Text(
               count,
@@ -409,14 +550,17 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
                 color: color,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey,
+                color: textColor,
+                fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

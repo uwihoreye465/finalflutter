@@ -103,7 +103,14 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
 
   Future<void> _markAsRead(int notificationId) async {
     try {
-      final response = await ApiService.markNotificationAsRead(notificationId);
+      // First try the toggle method
+      var response = await ApiService.toggleNotificationRead(notificationId);
+      
+      // If toggle fails, try the direct mark as read method
+      if (response['success'] != true) {
+        response = await ApiService.markNotificationAsRead(notificationId);
+      }
+      
       if (response['success'] == true) {
         setState(() {
           final index = _notifications.indexWhere((n) => n.notId == notificationId);
@@ -119,23 +126,40 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
               longitude: _notifications[index].longitude,
               locationName: _notifications[index].locationName,
               createdAt: _notifications[index].createdAt,
-              isRead: true, // Mark as read
+              isRead: true,
             );
             _totalUnread--;
             _totalRead++;
           }
         });
-        _showSuccessToast('Notification marked as read');
+        _showSuccessToast('✅ Notification marked as read successfully');
       } else {
-        _showErrorToast('Failed to mark notification as read: ${response['message']}');
+        _showErrorToast('❌ Failed to mark notification as read');
       }
     } catch (e) {
-      String errorMessage = e.toString();
-      // Truncate very long error messages to prevent UI issues
-      if (errorMessage.length > 100) {
-        errorMessage = errorMessage.substring(0, 100) + '...';
-      }
-      _showErrorToast('Error marking notification as read: $errorMessage');
+      debugPrint('Error marking notification as read: $e');
+      // Optimistic update - update UI even if API fails
+      setState(() {
+        final index = _notifications.indexWhere((n) => n.notId == notificationId);
+        if (index != -1) {
+          _notifications[index] = NotificationModel(
+            notId: _notifications[index].notId,
+            nearRib: _notifications[index].nearRib,
+            fullname: _notifications[index].fullname,
+            address: _notifications[index].address,
+            phone: _notifications[index].phone,
+            message: _notifications[index].message,
+            latitude: _notifications[index].latitude,
+            longitude: _notifications[index].longitude,
+            locationName: _notifications[index].locationName,
+            createdAt: _notifications[index].createdAt,
+            isRead: true,
+          );
+          _totalUnread--;
+          _totalRead++;
+        }
+      });
+      _showSuccessToast('✅ Notification marked as read (offline)');
     }
   }
 
@@ -239,6 +263,16 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
       toastLength: Toast.LENGTH_LONG,
       gravity: ToastGravity.BOTTOM,
       backgroundColor: AppColors.errorColor,
+      textColor: Colors.white,
+    );
+  }
+
+  void _showWarningToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: AppColors.warningColor,
       textColor: Colors.white,
     );
   }

@@ -8,6 +8,7 @@ import '../../utils/constants.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
+import '../user/enhanced_report_screen.dart';
 
 class EnhancedCriminalManagementScreen extends StatefulWidget {
   const EnhancedCriminalManagementScreen({super.key});
@@ -958,8 +959,10 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            _clearForm();
-            _showAddCriminalDialog();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const EnhancedReportScreen()),
+            );
           },
           backgroundColor: AppColors.primaryColor,
           child: const Icon(Icons.add, color: Colors.white),

@@ -11,6 +11,7 @@ import '../../utils/constants.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
+import '../user/enhanced_report_screen.dart';
 
 class EnhancedVictimManagementScreen extends StatefulWidget {
   const EnhancedVictimManagementScreen({super.key});
@@ -1283,8 +1284,10 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            _clearForm();
-            _showAddVictimDialog();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const EnhancedReportScreen()),
+            );
           },
           backgroundColor: AppColors.primaryColor,
           child: const Icon(Icons.add, color: Colors.white),

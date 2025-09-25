@@ -100,6 +100,75 @@ class _RecordsOverviewScreenState extends State<RecordsOverviewScreen> {
     );
   }
 
+  void _showSuccessToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      backgroundColor: AppColors.successColor,
+      textColor: Colors.white,
+    );
+  }
+
+  Future<void> _deleteRecord(int recordId) async {
+    try {
+      debugPrint('Attempting to delete record with ID: $recordId');
+      
+      // Try to delete the victim record first
+      final response = await ApiService.deleteVictimCriminalRecord(recordId);
+      debugPrint('Delete response: $response');
+      
+      if (response['success'] == true) {
+        _showSuccessToast('✅ Victim and all associated criminal records deleted successfully');
+        _loadData(); // Reload the data
+      } else {
+        debugPrint('Primary delete failed, trying alternative method...');
+        // Try alternative delete method
+        try {
+          final success = await ApiService.deleteVictim(recordId);
+          if (success) {
+            _showSuccessToast('✅ Victim record deleted successfully');
+            _loadData(); // Reload the data
+          } else {
+            _showErrorToast('❌ Unable to delete: Record ID not found or already deleted');
+          }
+        } catch (e2) {
+          debugPrint('Alternative delete also failed: $e2');
+          _showErrorToast('❌ Unable to delete: Record ID not found');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error deleting record: $e');
+      _showErrorToast('❌ Unable to delete: Record ID not found');
+    }
+  }
+
+  void _showDeleteConfirmation(int recordId, String recordName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Victim & Criminal Records'),
+          content: Text('Are you sure you want to delete the victim "$recordName" and ALL associated criminal records? This action cannot be undone and will permanently remove all data.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteRecord(recordId);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.errorColor,
+              ),
+              child: const Text('Delete All'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -200,7 +269,7 @@ class _RecordsOverviewScreenState extends State<RecordsOverviewScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with Crime Type
+            // Header with Crime Type and Delete Button
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -216,13 +285,39 @@ class _RecordsOverviewScreenState extends State<RecordsOverviewScreen> {
                 children: [
                   Icon(Icons.gavel, color: AppColors.primaryColor, size: 20),
                   const SizedBox(width: 8),
-                  Text(
-                    'Crime Type: $victimCrimeType',
-                    style: TextStyle(
-                      color: AppColors.primaryColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  Expanded(
+                    child: Text(
+                      'Crime Type: $victimCrimeType',
+                      style: TextStyle(
+                        color: AppColors.primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      final victimId = victimData['id'] ?? victimData['victim_id'];
+                      if (victimId != null) {
+                        // Convert to int if it's a string
+                        int? recordId;
+                        if (victimId is String) {
+                          recordId = int.tryParse(victimId);
+                        } else if (victimId is int) {
+                          recordId = victimId;
+                        }
+                        
+                        if (recordId != null) {
+                          _showDeleteConfirmation(recordId, victimName);
+                        } else {
+                          _showErrorToast('❌ Unable to delete: Invalid Record ID format');
+                        }
+                      } else {
+                        _showErrorToast('❌ Unable to delete: Record ID not found');
+                      }
+                    },
+                    icon: Icon(Icons.delete, color: AppColors.errorColor, size: 20),
+                    tooltip: 'Delete Victim & All Criminal Records',
                   ),
                 ],
               ),
@@ -322,6 +417,15 @@ class _RecordsOverviewScreenState extends State<RecordsOverviewScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Text(
+                              'Criminal Record',
+                              style: TextStyle(
+                                color: AppColors.errorColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             _buildDetailRow('Criminal ID', criminalId, Icons.badge),
                             _buildDetailRow('ID Number', criminalIdNumber, Icons.credit_card),
                             _buildDetailRow('Name', criminalName, Icons.person_outline),

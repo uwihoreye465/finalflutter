@@ -9,7 +9,6 @@ import 'enhanced_criminal_management_screen.dart';
 import 'enhanced_arrested_criminals_screen.dart';
 import 'enhanced_victim_management_screen.dart';
 import 'rib_assigned_notifications_screen.dart';
-import 'rib_statistics_screen.dart';
 import 'records_overview_screen.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -39,11 +38,27 @@ class _RibStationDashboardState extends State<RibStationDashboard>
   Future<void> _initializeData() async {
     await _loadUserInfo();
     await _loadStatistics();
+    
+    // If still loading after 5 seconds, force stop loading
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _isLoading) {
+        setState(() {
+          _isLoading = false;
+        });
+        debugPrint('Forced loading to stop after timeout');
+      }
+    });
+  }
+
+  // Method to refresh statistics (can be called from other screens)
+  Future<void> refreshStatistics() async {
+    await _loadStatistics();
   }
 
   Future<void> _loadUserInfo() async {
     try {
-      final authService = AuthService();
+      // Use Provider to get the AuthService instance
+      final authService = Provider.of<AuthService>(context, listen: false);
       final user = authService.user;
       debugPrint('Auth service user: $user');
       
@@ -55,7 +70,20 @@ class _RibStationDashboardState extends State<RibStationDashboard>
         });
         debugPrint('User loaded: $_userName from $_userSector (ID: $_userId)');
       } else {
-        debugPrint('No user found in auth service');
+        debugPrint('No user found in auth service, trying to reload...');
+        // Try to reload from storage
+        await authService.loadUserFromStorage();
+        final reloadedUser = authService.user;
+        if (reloadedUser != null) {
+          setState(() {
+            _userName = reloadedUser.fullname;
+            _userSector = reloadedUser.sector;
+            _userId = reloadedUser.userId;
+          });
+          debugPrint('User reloaded: $_userName from $_userSector (ID: $_userId)');
+        } else {
+          debugPrint('Still no user found after reload');
+        }
       }
     } catch (e) {
       debugPrint('Error loading user info: $e');
@@ -69,6 +97,55 @@ class _RibStationDashboardState extends State<RibStationDashboard>
 
     try {
       debugPrint('Loading statistics...');
+      
+      // First try to get user-specific notifications
+      if (_userId != null) {
+        final userNotificationsResponse = await ApiService.getUserNotifications(_userId!);
+        debugPrint('User notifications response: $userNotificationsResponse');
+        
+        if (userNotificationsResponse['success'] == true) {
+          final notifications = userNotificationsResponse['data']['notifications'] as List<dynamic>? ?? [];
+          final totalAssigned = notifications.length;
+          final readAssigned = notifications.where((n) => n['is_read'] == true).length;
+          final unreadAssigned = notifications.where((n) => n['is_read'] == false).length;
+          final readRate = totalAssigned > 0 ? ((readAssigned / totalAssigned) * 100).round() : 0;
+          
+          setState(() {
+            _notificationStats = {
+              'overall_stats': {
+                'assigned_notifications': totalAssigned,
+                'assigned_read_notifications': readAssigned,
+                'assigned_unread_notifications': unreadAssigned,
+                'assigned_read_percentage': readRate,
+              },
+              'user_stats': [{
+                'user_id': _userId,
+                'fullname': _userName,
+                'sector': _userSector,
+                'total_assigned_notifications': totalAssigned,
+                'read_notifications': readAssigned,
+                'unread_notifications': unreadAssigned,
+                'read_percentage': readRate,
+              }],
+              'sector_stats': [{
+                'sector': _userSector,
+                'assigned_notifications': totalAssigned,
+                'assigned_read': readAssigned,
+                'assigned_unread': unreadAssigned,
+                'assigned_read_percentage': readRate,
+              }],
+            };
+          });
+          
+          debugPrint('User-specific statistics loaded: Total=$totalAssigned, Read=$readAssigned, Unread=$unreadAssigned');
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+      
+      // Fallback to assignment statistics API
       final response = await ApiService.getNotificationAssignmentStatistics();
       debugPrint('Statistics API response: $response');
       
@@ -189,7 +266,10 @@ class _RibStationDashboardState extends State<RibStationDashboard>
           const EnhancedCriminalManagementScreen(),
           const EnhancedArrestedCriminalsScreen(),
           const EnhancedVictimManagementScreen(),
-          const RibAssignedNotificationsScreen(),
+          RibAssignedNotificationsScreen(onNotificationChanged: () {
+            // Refresh statistics when notifications change
+            _loadStatistics();
+          }),
           const RecordsOverviewScreen(),
         ],
       ),
@@ -333,9 +413,9 @@ class _RibStationDashboardState extends State<RibStationDashboard>
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.1,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.4,
           children: [
             _buildStatCard(
               title: 'Total Assigned',
@@ -733,32 +813,35 @@ class _RibStationDashboardState extends State<RibStationDashboard>
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
               color: Colors.white,
-              size: 28,
+              size: 26,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               value,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+            const SizedBox(height: 4),
+            Flexible(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

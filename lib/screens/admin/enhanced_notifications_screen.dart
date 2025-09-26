@@ -103,13 +103,8 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
 
   Future<void> _markAsRead(int notificationId) async {
     try {
-      // First try the toggle method
-      var response = await ApiService.toggleNotificationRead(notificationId);
-      
-      // If toggle fails, try the direct mark as read method
-      if (response['success'] != true) {
-        response = await ApiService.markNotificationAsRead(notificationId);
-      }
+      // Use the direct mark as read method for admin dashboard
+      final response = await ApiService.markNotificationAsRead(notificationId);
       
       if (response['success'] == true) {
         setState(() {
@@ -351,6 +346,13 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
         backgroundColor: AppColors.primaryColor,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () => _loadNotifications(refresh: true),
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Refresh Notifications',
+          ),
+        ],
       ),
       body: Column(
         children: [

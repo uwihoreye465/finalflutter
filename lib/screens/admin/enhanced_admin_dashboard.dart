@@ -79,6 +79,38 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
     }
   }
 
+  Future<void> _refreshData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      await _loadStatistics();
+      Fluttertoast.showToast(
+        msg: '✅ Data refreshed successfully',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.successColor,
+        textColor: Colors.white,
+      );
+    } catch (e) {
+      debugPrint('Refresh error: $e');
+      Fluttertoast.showToast(
+        msg: '❌ Error refreshing data: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -129,44 +161,7 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         debugPrint('Failed to load notification stats: ${results[3]}');
       }
       
-      // Always try to load notifications directly as additional data source
-      try {
-        final directResponse = await ApiService.getNotificationsAdmin();
-        debugPrint('Direct notifications response: $directResponse');
-        
-        if (directResponse['success'] == true) {
-          List<dynamic> notifications;
-          if (directResponse['data'] is List) {
-            notifications = directResponse['data'] as List;
-          } else if (directResponse['data']['notifications'] != null) {
-            notifications = directResponse['data']['notifications'] as List;
-          } else {
-            notifications = [];
-          }
-          
-          debugPrint('Found ${notifications.length} notifications');
-          final unreadCount = notifications.where((n) => n['is_read'] == false).length;
-          final readCount = notifications.where((n) => n['is_read'] == true).length;
-          debugPrint('Unread: $unreadCount, Read: $readCount');
-          
-          // Update notification stats with direct data
-          _notificationStats = {
-            'overall_statistics': {
-              'total_notifications': notifications.length,
-              'unread_notifications': unreadCount,
-              'read_notifications': readCount,
-            },
-            'overall_stats': {
-              'total_notifications': notifications.length,
-              'unread_notifications': unreadCount,
-              'read_notifications': readCount,
-            }
-          };
-          debugPrint('Updated notification stats with direct data: $_notificationStats');
-        }
-      } catch (e) {
-        debugPrint('Direct notification loading failed: $e');
-      }
+      // Notification stats are now properly loaded in _loadNotificationStats method
 
       // Process user statistics
       if (results[4]['success'] == true) {
@@ -221,57 +216,38 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
 
   Future<Map<String, dynamic>> _loadNotificationStats() async {
     try {
-      // First try the assignment statistics API
-      final response = await ApiService.getNotificationAssignmentStatistics();
-      debugPrint('Admin notification assignment stats response: $response');
+      // Admin dashboard should use getNotificationsAdmin to get all notifications
+      final response = await ApiService.getNotificationsAdmin();
+      debugPrint('Admin notifications response: $response');
       
       if (response['success'] == true) {
-        final data = response['data'];
-        final overallStats = data['overall_stats'] as Map<String, dynamic>? ?? {};
+        List<dynamic> notifications;
+        if (response['data'] is List) {
+          notifications = response['data'] as List;
+        } else if (response['data']['notifications'] != null) {
+          notifications = response['data']['notifications'] as List;
+        } else {
+          notifications = [];
+        }
         
-        debugPrint('Overall stats: $overallStats');
+        final totalNotifications = notifications.length;
+        final unreadNotifications = notifications.where((notification) => notification['is_read'] == false).length;
+        final readNotifications = notifications.where((notification) => notification['is_read'] == true).length;
+
+        debugPrint('Admin notification stats: Total=$totalNotifications, Unread=$unreadNotifications, Read=$readNotifications');
 
         return {
           'success': true,
           'data': {
             'overall_statistics': {
-              'total_messages': overallStats['total_notifications'] ?? 0,
-              'unread_messages': overallStats['assigned_unread_notifications'] ?? 0,
-              'read_messages': overallStats['assigned_read_notifications'] ?? 0,
-              'assigned_messages': overallStats['assigned_notifications'] ?? 0,
-              'unassigned_messages': overallStats['unassigned_notifications'] ?? 0,
+              'total_messages': totalNotifications,
+              'unread_messages': unreadNotifications,
+              'read_messages': readNotifications,
             }
           }
         };
       } else {
-        debugPrint('Assignment stats failed, trying regular notifications API...');
-        // Fallback to regular notifications API
-        final fallbackResponse = await ApiService.getNotificationsAdmin();
-        if (fallbackResponse['success'] == true) {
-          List<dynamic> notifications;
-          if (fallbackResponse['data'] is List) {
-            notifications = fallbackResponse['data'] as List;
-          } else if (fallbackResponse['data']['notifications'] != null) {
-            notifications = fallbackResponse['data']['notifications'] as List;
-          } else {
-            notifications = [];
-          }
-          
-          final totalNotifications = notifications.length;
-          final unreadNotifications = notifications.where((notification) => notification['is_read'] == false).length;
-          final readNotifications = notifications.where((notification) => notification['is_read'] == true).length;
-
-          return {
-            'success': true,
-            'data': {
-              'overall_statistics': {
-                'total_messages': totalNotifications,
-                'unread_messages': unreadNotifications,
-                'read_messages': readNotifications,
-              }
-            }
-          };
-        }
+        debugPrint('Admin notifications API failed');
         return {'success': false, 'data': {}};
       }
     } catch (e) {
@@ -357,6 +333,11 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         backgroundColor: AppColors.primaryColor,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            onPressed: _refreshData,
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Refresh Data',
+          ),
           IconButton(
             onPressed: _logout,
             icon: const Icon(Icons.logout, color: Colors.white),

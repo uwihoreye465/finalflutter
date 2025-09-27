@@ -295,30 +295,6 @@ class _RecordsOverviewScreenState extends State<RecordsOverviewScreen> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {
-                      final victimId = victimData['id'] ?? victimData['victim_id'];
-                      if (victimId != null) {
-                        // Convert to int if it's a string
-                        int? recordId;
-                        if (victimId is String) {
-                          recordId = int.tryParse(victimId);
-                        } else if (victimId is int) {
-                          recordId = victimId;
-                        }
-                        
-                        if (recordId != null) {
-                          _showDeleteConfirmation(recordId, victimName);
-                        } else {
-                          _showErrorToast('❌ Unable to delete: Invalid Record ID format');
-                        }
-                      } else {
-                        _showErrorToast('❌ Unable to delete: Record ID not found');
-                      }
-                    },
-                    icon: Icon(Icons.delete, color: AppColors.errorColor, size: 20),
-                    tooltip: 'Delete Victim & All Criminal Records',
-                  ),
                 ],
               ),
             ),

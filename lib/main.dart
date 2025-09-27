@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
+import 'services/session_manager.dart';
 import 'screens/home/home_screen.dart';
 import 'utils/constants.dart';
 
@@ -17,6 +18,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => SessionManager()),
       ],
       child: MaterialApp(
         title: 'Criminal Tracking System',

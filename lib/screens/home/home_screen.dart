@@ -3,6 +3,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/session_manager.dart';
+import '../../services/location_service.dart';
 import '../../models/criminal_record.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_text_field.dart';
@@ -322,6 +324,18 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () async {
               if (_formKey.currentState!.validate()) {
                 try {
+                  // Show loading indicator
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+
+                  // Get current location
+                  final locationData = await LocationService.getLocationWithFallback();
+                  
                   final notificationData = {
                     'near_rib': _selectedRibStation ?? '',
                     'fullname': _fullnameController.text.trim(),
@@ -330,7 +344,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     'message': _messageController.text.trim(),
                   };
 
+                  // Add location data if available
+                  if (locationData != null && locationData['success'] == true) {
+                    notificationData['latitude'] = locationData['latitude'];
+                    notificationData['longitude'] = locationData['longitude'];
+                    notificationData['location_name'] = locationData['location_name'];
+                  } else {
+                    // Use fallback location
+                    notificationData['latitude'] = '-1.94410000'; // Kigali coordinates
+                    notificationData['longitude'] = '30.06190000';
+                    notificationData['location_name'] = 'Kigali, Rwanda (Development/Testing)';
+                  }
+
                   await ApiService.sendNotification(notificationData);
+                  
+                  // Close loading dialog
+                  Navigator.pop(context);
                   
                   Fluttertoast.showToast(
                     msg: 'Alert sent to RIB successfully',
@@ -342,6 +371,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   
                   Navigator.pop(context);
                 } catch (e) {
+                  // Close loading dialog if open
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                  
                   Fluttertoast.showToast(
                     msg: 'Error sending alert: $e',
                     toastLength: Toast.LENGTH_SHORT,
@@ -365,19 +399,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isLoggedIn = false;
-    bool isAdmin = false;
-    bool isNearRib = false;
-    AuthService? authService;
-
-    try {
-      authService = Provider.of<AuthService>(context, listen: false);
-      isLoggedIn = authService.isAuthenticated;
-      isAdmin = authService.user?.role == 'admin';
-      isNearRib = authService.user?.role == 'near_rib';
-    } catch (e) {
-      debugPrint('Auth service not available: $e');
-    }
+    return Consumer2<AuthService, SessionManager>(
+      builder: (context, authService, sessionManager, child) {
+        bool isLoggedIn = authService.isAuthenticated;
+        bool isAdmin = authService.user?.role == 'admin';
+        bool isNearRib = authService.user?.role == 'near_rib';
+        
+        // Update session activity on user interaction
+        if (isLoggedIn) {
+          sessionManager.updateActivity();
+        }
 
     return Scaffold(
       body: Container(
@@ -408,9 +439,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (isLoggedIn)
                       PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert, color: Colors.white),
-                        onSelected: (value) {
+                        onSelected: (value) async {
                           if (value == 'logout') {
-                            AuthService().logout();
+                            await authService.logout();
+                            // Show logout confirmation
+                            Fluttertoast.showToast(
+                              msg: 'Logged out successfully',
+                              toastLength: Toast.LENGTH_SHORT,
+                              gravity: ToastGravity.BOTTOM,
+                              backgroundColor: AppColors.successColor,
+                              textColor: Colors.white,
+                            );
                           } else if (value == 'admin' && isAdmin) {
                             Navigator.push(
                               context,
@@ -460,8 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
               
               // Main Content
               Expanded(
-                child: Container(
-                  width: double.infinity,
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -502,46 +540,80 @@ class _HomeScreenState extends State<HomeScreen> {
                       
                       const SizedBox(height: 50),
                       
-                      // Search Input (only for non-logged users)
+                      // Professional Search Input (only for non-logged users)
                       if (!isLoggedIn) ...[
-                        CustomTextField(
-                          controller: _searchController,
-                          hintText: 'Enter id',
-                          fillColor: Colors.white,
-                          onSubmitted: (_) => _searchCriminal(),
-                          onChanged: (value) {
-                            // Auto-search when non-passport reaches 16 digits
-                            if (value.trim().length == 16 && !_looksLikePassport(value.trim())) {
-                              _searchCriminal();
-                            }
-                          },
-                        ),
-                        
-                        const SizedBox(height: 20),
-                        
-                        // Search Button
-                        if (_isLoading)
-                          const LoadingWidget()
-                        else
-                          ElevatedButton(
-                            onPressed: _searchCriminal,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: AppColors.primaryColor,
-                              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                              shape: RoundedRectangleBorder(
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(25),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Enter ID Number or Passport',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 16,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: AppColors.primaryColor,
+                                size: 24,
+                              ),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(
+                                        Icons.clear,
+                                        color: Colors.grey[600],
+                                      ),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() {});
+                                      },
+                                    )
+                                  : null,
+                              border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide(
+                                  color: AppColors.primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 16,
                               ),
                             ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.search),
-                                SizedBox(width: 8),
-                                Text('Search'),
-                              ],
-                            ),
+                            onSubmitted: (_) => _searchCriminal(),
+                            onChanged: (value) {
+                              setState(() {}); // Update UI to show/hide clear button
+                              // Auto-search when non-passport reaches 16 digits
+                              if (value.trim().length == 16 && !_looksLikePassport(value.trim())) {
+                                _searchCriminal();
+                              }
+                            },
+                            textInputAction: TextInputAction.search,
+                            keyboardType: TextInputType.text,
                           ),
+                        ),
+                        
                       ],
                       
                       const SizedBox(height: 20),
@@ -604,6 +676,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 

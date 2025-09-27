@@ -44,10 +44,7 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
 
     try {
       print('Loading notifications - Page: $_currentPage, Limit: $_itemsPerPage');
-      final response = await ApiService.getNotifications(
-        page: _currentPage,
-        limit: _itemsPerPage,
-      );
+      final response = await ApiService.getNotificationsAdmin();
       print('Notifications API response: $response');
 
       if (response['success'] == true) {
@@ -103,8 +100,24 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
 
   Future<void> _markAsRead(int notificationId) async {
     try {
+      debugPrint('Marking notification $notificationId as read...');
+      
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+      
       // Use the direct mark as read method for admin dashboard
       final response = await ApiService.markNotificationAsRead(notificationId);
+      
+      // Close loading dialog
+      Navigator.pop(context);
+      
+      debugPrint('Mark as read response: $response');
       
       if (response['success'] == true) {
         setState(() {
@@ -128,33 +141,19 @@ class _EnhancedNotificationsScreenState extends State<EnhancedNotificationsScree
           }
         });
         _showSuccessToast('✅ Notification marked as read successfully');
+        
+        // Reload notifications to get updated data from server
+        _loadNotifications();
       } else {
-        _showErrorToast('❌ Failed to mark notification as read');
+        _showErrorToast('❌ Failed to mark notification as read: ${response['message'] ?? 'Unknown error'}');
       }
     } catch (e) {
+      // Close loading dialog if open
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
       debugPrint('Error marking notification as read: $e');
-      // Optimistic update - update UI even if API fails
-      setState(() {
-        final index = _notifications.indexWhere((n) => n.notId == notificationId);
-        if (index != -1) {
-          _notifications[index] = NotificationModel(
-            notId: _notifications[index].notId,
-            nearRib: _notifications[index].nearRib,
-            fullname: _notifications[index].fullname,
-            address: _notifications[index].address,
-            phone: _notifications[index].phone,
-            message: _notifications[index].message,
-            latitude: _notifications[index].latitude,
-            longitude: _notifications[index].longitude,
-            locationName: _notifications[index].locationName,
-            createdAt: _notifications[index].createdAt,
-            isRead: true,
-          );
-          _totalUnread--;
-          _totalRead++;
-        }
-      });
-      _showSuccessToast('✅ Notification marked as read (offline)');
+      _showErrorToast('❌ Error marking notification as read: $e');
     }
   }
 

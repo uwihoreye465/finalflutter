@@ -522,36 +522,43 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                               Text('Position: ${user.position}'),
                             ],
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!user.isApproved)
+                          trailing: SizedBox(
+                            width: 120,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!user.isApproved)
+                                  IconButton(
+                                    onPressed: () => _approveUser(user),
+                                    icon: const Icon(Icons.check_circle),
+                                    color: AppColors.successColor,
+                                    tooltip: 'Approve User',
+                                    iconSize: 20,
+                                  ),
+                                if (user.isApproved)
+                                  IconButton(
+                                    onPressed: () => _blockUser(user),
+                                    icon: const Icon(Icons.block),
+                                    color: AppColors.warningColor,
+                                    tooltip: 'Block User',
+                                    iconSize: 20,
+                                  ),
                                 IconButton(
-                                  onPressed: () => _approveUser(user),
-                                  icon: const Icon(Icons.check_circle),
-                                  color: AppColors.successColor,
-                                  tooltip: 'Approve User',
+                                  onPressed: () => _editUser(user),
+                                  icon: const Icon(Icons.edit),
+                                  color: AppColors.primaryColor,
+                                  tooltip: 'Edit User',
+                                  iconSize: 20,
                                 ),
-                              if (user.isApproved)
                                 IconButton(
-                                  onPressed: () => _blockUser(user),
-                                  icon: const Icon(Icons.block),
-                                  color: AppColors.warningColor,
-                                  tooltip: 'Block User',
+                                  onPressed: () => _deleteUser(user),
+                                  icon: const Icon(Icons.delete),
+                                  color: AppColors.errorColor,
+                                  tooltip: 'Delete User',
+                                  iconSize: 20,
                                 ),
-                              IconButton(
-                                onPressed: () => _editUser(user),
-                                icon: const Icon(Icons.edit),
-                                color: AppColors.primaryColor,
-                                tooltip: 'Edit User',
-                              ),
-                              IconButton(
-                                onPressed: () => _deleteUser(user),
-                                icon: const Icon(Icons.delete),
-                                color: AppColors.errorColor,
-                                tooltip: 'Delete User',
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       );

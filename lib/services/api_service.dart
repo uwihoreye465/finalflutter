@@ -26,7 +26,7 @@ class ApiService {
       debugPrint('Testing API connection to: $baseUrl$apiVersion');
       
       // Try multiple endpoints to test connectivity
-      final endpoints = ['/health', '/auth/login', '/criminal-records'];
+      final endpoints = ['/health', '/auth/login', '/criminal-records', '/notifications'];
       
       for (String endpoint in endpoints) {
         try {
@@ -48,6 +48,35 @@ class ApiService {
     } catch (e) {
       debugPrint('API connection test failed: $e');
       return false;
+    }
+  }
+  
+  // Test notifications API specifically
+  static Future<Map<String, dynamic>> testNotificationsApi() async {
+    try {
+      debugPrint('Testing notifications API...');
+      final url = _url('/notifications');
+      debugPrint('Testing URL: $url');
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+      
+      debugPrint('Notifications API response status: ${response.statusCode}');
+      debugPrint('Notifications API response body: ${response.body}');
+      
+      return {
+        'success': response.statusCode == 200,
+        'status_code': response.statusCode,
+        'body': response.body,
+      };
+    } catch (e) {
+      debugPrint('Notifications API test failed: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
     }
   }
   
@@ -1012,7 +1041,7 @@ class ApiService {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(
-        Uri.parse(_url('/notifications')),
+        Uri.parse(_url('/notifications/admin/all')),
         headers: headers,
       );
 
@@ -1239,60 +1268,101 @@ class ApiService {
     }
   }
 
-  // Mark notification as read
+  // Mark notification as read (Admin)
   static Future<Map<String, dynamic>> markNotificationAsRead(int notificationId) async {
     try {
       final headers = await _getJsonHeaders();
-      final url = _url('/notifications/$notificationId/read');
-      debugPrint('Marking notification as read - URL: $url');
+      debugPrint('Marking notification as read (Admin) - Notification ID: $notificationId');
       debugPrint('Headers: $headers');
-      debugPrint('Notification ID: $notificationId');
       
-      final response = await http.patch(
-        Uri.parse(url),
-        headers: headers,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          throw Exception('Request timeout - API server may be slow');
-        },
-      );
-
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-        return {
-          'success': true,
-          'message': result['message'] ?? 'Notification marked as read successfully',
-          'data': result['data'] ?? {'new_status': true}
-        };
-      } else if (response.statusCode == 401) {
-        throw Exception('Authentication failed - please login again');
-      } else {
-        final errorBody = response.body;
-        debugPrint('API Error response: $errorBody');
-        throw Exception('API Error ${response.statusCode}: $errorBody');
+      // Check if token exists
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token == null || token.isEmpty) {
+        throw Exception('No authentication token found. Please login again.');
       }
+      
+      // Use the correct admin endpoint as provided by user
+      final endpoints = [
+        '/notifications/admin/$notificationId/read',
+        '/notifications/$notificationId/toggle-read',
+        '/notifications/$notificationId/read',
+      ];
+      
+      for (int i = 0; i < endpoints.length; i++) {
+        try {
+          final url = _url(endpoints[i]);
+          debugPrint('Trying endpoint ${i + 1}/${endpoints.length}: $url');
+          
+          final response = await http.patch(
+            Uri.parse(url),
+            headers: headers,
+            body: jsonEncode({'is_read': true}),
+          ).timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception('Request timeout');
+            },
+          );
+
+          debugPrint('Response status: ${response.statusCode}');
+          debugPrint('Response body: ${response.body}');
+
+          if (response.statusCode == 200) {
+            final result = jsonDecode(response.body);
+            debugPrint('Mark as read successful: $result');
+            return {
+              'success': true,
+              'message': result['message'] ?? 'Notification marked as read successfully',
+              'data': result['data'] ?? {'new_status': true}
+            };
+          } else if (response.statusCode == 401) {
+            throw Exception('Authentication failed - please login again');
+          } else if (response.statusCode == 404) {
+            debugPrint('Endpoint not found, trying next...');
+            continue;
+          } else {
+            debugPrint('Endpoint failed with status ${response.statusCode}, trying next...');
+            continue;
+          }
+        } catch (e) {
+          debugPrint('Endpoint ${i + 1} failed: $e');
+          if (i == endpoints.length - 1) {
+            // Last endpoint failed, throw the error
+            rethrow;
+          }
+          continue;
+        }
+      }
+      
+      throw Exception('All endpoints failed');
     } catch (e) {
       debugPrint('Error in markNotificationAsRead: $e');
-      throw Exception('Error marking notification as read: $e');
+      if (e.toString().contains('Failed to fetch')) {
+        throw Exception('Network error - please check your internet connection');
+      } else if (e.toString().contains('SocketException')) {
+        throw Exception('Cannot connect to server - please check your internet connection');
+      } else {
+        throw Exception('Error marking notification as read: $e');
+      }
     }
   }
 
   static Future<Map<String, dynamic>> markMultipleNotificationsAsRead(List<int> notificationIds) async {
     try {
       final headers = await _getJsonHeaders();
-      final url = _url('/notifications/mark-multiple-read');
-      debugPrint('Marking multiple notifications as read - URL: $url');
+      final url = _url('/notifications/admin/mark-multiple-read');
+      debugPrint('Marking multiple notifications as read (Admin) - URL: $url');
       debugPrint('Headers: $headers');
       debugPrint('Notification IDs: $notificationIds');
       
       final response = await http.patch(
         Uri.parse(url),
         headers: headers,
-        body: jsonEncode({'notification_ids': notificationIds}),
+        body: jsonEncode({
+          'notification_ids': notificationIds,
+          'is_read': true
+        }),
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
@@ -1307,7 +1377,7 @@ class ApiService {
         final result = jsonDecode(response.body);
         return {
           'success': true,
-          'message': 'Multiple notifications marked as read successfully',
+          'message': result['message'] ?? 'Multiple notifications marked as read successfully',
           'data': result['data'] ?? {}
         };
       } else if (response.statusCode == 401) {
@@ -1489,18 +1559,19 @@ class ApiService {
     }
   }
 
-  // Mark notification as unread
+  // Mark notification as unread (Admin)
   static Future<Map<String, dynamic>> markNotificationAsUnread(int notificationId) async {
     try {
       final headers = await _getJsonHeaders();
-      final url = _url('/notifications/$notificationId/unread');
-      debugPrint('Marking notification as unread - URL: $url');
+      final url = _url('/notifications/admin/$notificationId/unread');
+      debugPrint('Marking notification as unread (Admin) - URL: $url');
       debugPrint('Headers: $headers');
       debugPrint('Notification ID: $notificationId');
       
       final response = await http.patch(
         Uri.parse(url),
         headers: headers,
+        body: jsonEncode({'is_read': false}),
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {

@@ -4,12 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/user.dart';
 import 'api_service.dart';
+import 'session_manager.dart';
 
 class AuthService with ChangeNotifier {
   User? _user;
   String? _token;
   bool _isAuthenticated = false;
   bool _isLoading = true;
+  SessionManager? _sessionManager;
 
   User? get user => _user;
   String? get token => _token;
@@ -18,6 +20,11 @@ class AuthService with ChangeNotifier {
 
   AuthService() {
     loadUserFromStorage();
+  }
+
+  // Set session manager reference
+  void setSessionManager(SessionManager sessionManager) {
+    _sessionManager = sessionManager;
   }
 
   Future<void> loadUserFromStorage() async {
@@ -79,6 +86,11 @@ class AuthService with ChangeNotifier {
         await prefs.setString('user', jsonEncode(_user!.toJson()));
         await prefs.setString('token', _token!);
         
+        // Start session
+        if (_sessionManager != null) {
+          await _sessionManager!.startSession(this);
+        }
+        
         notifyListeners();
       } else {
         throw Exception(response['message'] ?? 'Login failed: Invalid credentials');
@@ -107,9 +119,18 @@ class AuthService with ChangeNotifier {
 
   Future<void> logout() async {
     try {
+      debugPrint('Starting logout process...');
+      
+      // Clear session
+      if (_sessionManager != null) {
+        await _sessionManager!.clearSession();
+      }
+      
+      // Clear local storage
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user');
       await prefs.remove('token');
+      await prefs.remove('refreshToken');
       
       // Clear instance state
       _user = null;
@@ -117,9 +138,46 @@ class AuthService with ChangeNotifier {
       _isAuthenticated = false;
       _isLoading = false;
       
+      debugPrint('Logout completed successfully');
       notifyListeners();
     } catch (e) {
       debugPrint('Error during logout: $e');
+      // Even if there's an error, clear the state
+      _user = null;
+      _token = null;
+      _isAuthenticated = false;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Check if token is valid and not expired
+  Future<bool> isTokenValid() async {
+    if (_token == null) return false;
+    
+    try {
+      // You can add token validation logic here
+      // For now, we'll just check if token exists and user is authenticated
+      return _isAuthenticated && _user != null;
+    } catch (e) {
+      debugPrint('Token validation error: $e');
+      return false;
+    }
+  }
+
+  // Refresh user session
+  Future<void> refreshSession() async {
+    try {
+      if (_token != null && _user != null) {
+        // Validate current session
+        final isValid = await isTokenValid();
+        if (!isValid) {
+          await logout();
+        }
+      }
+    } catch (e) {
+      debugPrint('Session refresh error: $e');
+      await logout();
     }
   }
 }

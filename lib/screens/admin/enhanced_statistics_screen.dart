@@ -48,12 +48,31 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
     });
 
     try {
+      // Test API connectivity first
+      debugPrint('Testing API connectivity...');
+      final testResult = await ApiService.testApiConnection();
+      debugPrint('API connectivity test result: $testResult');
+      
+      // Test notifications API specifically
+      debugPrint('Testing notifications API...');
+      final notificationsTest = await ApiService.testNotificationsApi();
+      debugPrint('Notifications API test result: $notificationsTest');
+      
+      // Test mark as read API (commented out to avoid issues)
+      // debugPrint('Testing mark as read API...');
+      // try {
+      //   final testMarkResult = await ApiService.markNotificationAsRead(82);
+      //   debugPrint('Test mark as read result: $testMarkResult');
+      // } catch (e) {
+      //   debugPrint('Test mark as read failed: $e');
+      // }
+      
       // Load all statistics in parallel
       final results = await Future.wait([
         ApiService.getCriminalRecordsStatistics(),
         ApiService.getArrestedStatistics(),
         ApiService.getVictimsStatistics(),
-        ApiService.getNotificationStatistics(),
+        ApiService.getNotificationsAdmin(), // Use admin-specific method
       ]);
 
       // Process criminal records statistics
@@ -76,9 +95,158 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
         _victimStats = results[2]['data'];
       }
 
-      // Process notifications statistics
+      // Process notifications statistics (admin format)
+      debugPrint('Statistics notifications result: ${results[3]}');
       if (results[3]['success'] == true) {
-        _notificationStats = results[3]['data'];
+        List<dynamic> notifications = [];
+        
+        // Try different ways to extract notifications
+        if (results[3]['data'] is List) {
+          notifications = results[3]['data'] as List;
+          debugPrint('Notifications from direct list: ${notifications.length}');
+        } else if (results[3]['data'] is Map) {
+          final data = results[3]['data'] as Map<String, dynamic>;
+          if (data['notifications'] != null) {
+            notifications = data['notifications'] as List;
+            debugPrint('Notifications from data.notifications: ${notifications.length}');
+          } else if (data['data'] != null && data['data'] is List) {
+            notifications = data['data'] as List;
+            debugPrint('Notifications from data.data: ${notifications.length}');
+          } else {
+            // Try to find any list in the data
+            for (var key in data.keys) {
+              if (data[key] is List) {
+                notifications = data[key] as List;
+                debugPrint('Notifications from data.$key: ${notifications.length}');
+                break;
+              }
+            }
+          }
+        }
+        
+        // If we still don't have notifications, try to get them directly
+        if (notifications.isEmpty) {
+          debugPrint('No notifications found in statistics, trying direct API call...');
+          try {
+            final directResult = await ApiService.getNotificationsAdmin();
+            debugPrint('Direct notifications result: $directResult');
+            if (directResult['success'] == true) {
+              if (directResult['data'] is List) {
+                notifications = directResult['data'] as List;
+              } else if (directResult['data'] is Map) {
+                final data = directResult['data'] as Map<String, dynamic>;
+                if (data['notifications'] != null) {
+                  notifications = data['notifications'] as List;
+                } else if (data['data'] != null && data['data'] is List) {
+                  notifications = data['data'] as List;
+                }
+              }
+              debugPrint('Direct API notifications count: ${notifications.length}');
+            }
+          } catch (e) {
+            debugPrint('Direct API call failed: $e');
+          }
+        }
+        
+        final totalNotifications = notifications.length;
+        final unreadNotifications = notifications.where((notification) => 
+          notification['is_read'] == false || notification['is_read'] == 'false').length;
+        final readNotifications = notifications.where((notification) => 
+          notification['is_read'] == true || notification['is_read'] == 'true').length;
+        final assignedNotifications = notifications.where((notification) => 
+          notification['assigned_user_id'] != null).length;
+        final unassignedNotifications = totalNotifications - assignedNotifications;
+
+        // Process RIB statistics from notifications
+        Map<String, Map<String, int>> ribStats = {};
+        for (var notification in notifications) {
+          String rib = notification['near_rib'] ?? 'Unknown RIB';
+          if (!ribStats.containsKey(rib)) {
+            ribStats[rib] = {
+              'total_notifications': 0,
+              'assigned_notifications': 0,
+              'assigned_unread': 0,
+              'assigned_read': 0,
+            };
+          }
+          
+          ribStats[rib]!['total_notifications'] = (ribStats[rib]!['total_notifications'] ?? 0) + 1;
+          
+          if (notification['assigned_user_id'] != null) {
+            ribStats[rib]!['assigned_notifications'] = (ribStats[rib]!['assigned_notifications'] ?? 0) + 1;
+            
+            if (notification['is_read'] == false || notification['is_read'] == 'false') {
+              ribStats[rib]!['assigned_unread'] = (ribStats[rib]!['assigned_unread'] ?? 0) + 1;
+            } else {
+              ribStats[rib]!['assigned_read'] = (ribStats[rib]!['assigned_read'] ?? 0) + 1;
+            }
+          }
+        }
+        
+        // Convert to list format for display
+        List<Map<String, dynamic>> sectorStats = ribStats.entries.map((entry) {
+          return {
+            'sector': entry.key,
+            'total_notifications': entry.value['total_notifications'] ?? 0,
+            'assigned_notifications': entry.value['assigned_notifications'] ?? 0,
+            'assigned_unread': entry.value['assigned_unread'] ?? 0,
+            'assigned_read': entry.value['assigned_read'] ?? 0,
+          };
+        }).toList();
+
+        _notificationStats = {
+          'overall_statistics': {
+            'total_messages': totalNotifications,
+            'unread_messages': unreadNotifications,
+            'read_messages': readNotifications,
+            'assigned_messages': assignedNotifications,
+            'unassigned_messages': unassignedNotifications,
+          },
+          'sector_stats': sectorStats,
+        };
+        
+        debugPrint('Final notification stats: Total=$totalNotifications, Unread=$unreadNotifications, Read=$readNotifications, Assigned=$assignedNotifications, Unassigned=$unassignedNotifications');
+      } else {
+        debugPrint('Statistics notifications API failed: ${results[3]['message']}');
+        // Try to get notifications from a different API
+        try {
+          final altResult = await ApiService.getNotificationStatistics();
+          debugPrint('Alternative notifications result: $altResult');
+          if (altResult['success'] == true) {
+            final data = altResult['data'];
+            _notificationStats = {
+              'overall_statistics': {
+                'total_messages': data['overall_statistics']?['total_messages'] ?? 0,
+                'unread_messages': data['overall_statistics']?['unread_messages'] ?? 0,
+                'read_messages': data['overall_statistics']?['read_messages'] ?? 0,
+                'assigned_messages': data['overall_statistics']?['assigned_messages'] ?? 0,
+                'unassigned_messages': data['overall_statistics']?['unassigned_messages'] ?? 0,
+              }
+            };
+            debugPrint('Using alternative API for notifications');
+          } else {
+            _notificationStats = {
+              'overall_statistics': {
+                'total_messages': 0,
+                'unread_messages': 0,
+                'read_messages': 0,
+                'assigned_messages': 0,
+                'unassigned_messages': 0,
+              }
+            };
+          }
+        } catch (e) {
+          debugPrint('Alternative API also failed: $e');
+          _notificationStats = {
+            'overall_statistics': {
+              'total_messages': 0,
+              'unread_messages': 0,
+              'read_messages': 0,
+              'assigned_messages': 0,
+              'unassigned_messages': 0,
+            }
+          };
+        }
       }
 
     } catch (e) {
@@ -271,7 +439,7 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
         ),
         _buildStatCard(
           'Notifications', 
-          _notificationStats['overall_statistics']?['total_messages'] ?? '0', 
+          (_notificationStats['overall_statistics']?['total_messages'] ?? 0).toString(), 
           Icons.notifications, 
           AppColors.primaryColor
         ),
@@ -282,29 +450,41 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
   Widget _buildStatCard(String title, String count, IconData icon, Color color) {
     return Card(
       elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      child: Container(
+        height: 120,
+        padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(
-              count,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
+            Icon(icon, size: 28, color: color),
+            const SizedBox(height: 6),
+            Flexible(
+              child: Text(
+                count,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
+            Flexible(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -346,7 +526,10 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           Text(
             value,
             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -979,7 +1162,7 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
   }
 
   Widget _buildNotificationStats() {
-    final overallStats = _notificationStats['overall_stats'] as Map<String, dynamic>? ?? {};
+    final overallStats = _notificationStats['overall_statistics'] as Map<String, dynamic>? ?? {};
     
     return Card(
       child: Padding(
@@ -992,11 +1175,11 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            _buildStatRow('Total Messages', overallStats['total_notifications']?.toString() ?? '0'),
-            _buildStatRow('Unread Messages', overallStats['assigned_unread_notifications']?.toString() ?? '0'),
-            _buildStatRow('Read Messages', overallStats['assigned_read_notifications']?.toString() ?? '0'),
-            _buildStatRow('Assigned Messages', overallStats['assigned_notifications']?.toString() ?? '0'),
-            _buildStatRow('Unassigned Messages', overallStats['unassigned_notifications']?.toString() ?? '0'),
+            _buildStatRow('Total Messages', overallStats['total_messages']?.toString() ?? '0'),
+            _buildStatRow('Unread Messages', overallStats['unread_messages']?.toString() ?? '0'),
+            _buildStatRow('Read Messages', overallStats['read_messages']?.toString() ?? '0'),
+            _buildStatRow('Assigned Messages', overallStats['assigned_messages']?.toString() ?? '0'),
+            _buildStatRow('Unassigned Messages', overallStats['unassigned_messages']?.toString() ?? '0'),
           ],
         ),
       ),

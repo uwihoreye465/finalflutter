@@ -7,6 +7,10 @@ import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/beautiful_footer.dart';
+import '../home/home_screen.dart';
+import '../news/news_screen.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -80,13 +84,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                   const SizedBox(height: 20),
                   
                   // Back Button
@@ -204,29 +211,56 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   
                   const SizedBox(height: 20),
                   
-                  // Login Link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        "Already have Account? ",
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          'Sign In',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        // Login Link
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "Already have Account? ",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text(
+                                'Sign In',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
-            ),
+              
+              // Beautiful Footer
+              BeautifulFooter(
+                currentIndex: 1,
+                onTap: (index) {
+                  switch (index) {
+                    case 0:
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => const HomeScreen()),
+                      );
+                      break;
+                    case 1:
+                      // Already on login/register screen
+                      break;
+                    case 2:
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NewsScreen()),
+                      );
+                      break;
+                  }
+                },
+              ),
+            ],
           ),
         ),
       ),

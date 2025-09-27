@@ -241,14 +241,14 @@ class _NewsScreenState extends State<NewsScreen> {
                         child: Column(
                           children: [
                             // 2x2 Grid Layout
-                            Expanded(
+                            Flexible(
                               child: GridView.builder(
                                 padding: const EdgeInsets.all(16),
                                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
-                                  childAspectRatio: 0.8,
-                                  crossAxisSpacing: 16,
-                                  mainAxisSpacing: 16,
+                                  childAspectRatio: 0.75,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
                                 ),
                                 itemCount: _arrestedCriminals.length,
                                 itemBuilder: (context, index) {
@@ -343,6 +343,7 @@ class _NewsScreenState extends State<NewsScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Header with alert badge
           Container(
@@ -385,15 +386,16 @@ class _NewsScreenState extends State<NewsScreen> {
           ),
           
           // Content
-          Expanded(
+          Flexible(
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Photo placeholder or actual image
                   Container(
                     width: double.infinity,
-                    height: 80,
+                    height: 70,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(8),
@@ -405,7 +407,7 @@ class _NewsScreenState extends State<NewsScreen> {
                             child: Image.network(
                               criminal.imageUrl!,
                               width: double.infinity,
-                              height: 80,
+                              height: 70,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return _buildPhotoPlaceholder();
@@ -418,39 +420,45 @@ class _NewsScreenState extends State<NewsScreen> {
                   const SizedBox(height: 8),
                   
                   // Criminal details
-                  Text(
-                    criminal.fullname,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                  Flexible(
+                    child: Text(
+                      criminal.fullname,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   
-                  Text(
-                    criminal.crimeType,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red[700],
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      criminal.crimeType,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   
                   if (criminal.arrestLocation != null) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      criminal.arrestLocation!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[600],
+                    Flexible(
+                      child: Text(
+                        criminal.arrestLocation!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],
@@ -465,7 +473,7 @@ class _NewsScreenState extends State<NewsScreen> {
   Widget _buildPhotoPlaceholder() {
     return Container(
       width: double.infinity,
-      height: 80,
+      height: 70,
       decoration: BoxDecoration(
         color: Colors.grey[300],
         borderRadius: BorderRadius.circular(8),

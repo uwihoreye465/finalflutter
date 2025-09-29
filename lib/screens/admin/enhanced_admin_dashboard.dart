@@ -55,9 +55,8 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
     try {
       await AuthService().logout();
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login',
           (route) => false,
         );
         Fluttertoast.showToast(

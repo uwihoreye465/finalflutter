@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
 import 'services/session_manager.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/auth/login_screen.dart';
 import 'utils/constants.dart';
 
 void main() async {
@@ -34,6 +35,7 @@ class MyApp extends StatelessWidget {
         home: const HomeScreen(), // Start with HomeScreen as requested
         routes: {
           '/home': (context) => const HomeScreen(),
+          '/login': (context) => const LoginScreen(),
         },
         debugShowCheckedModeBanner: false,
       ),

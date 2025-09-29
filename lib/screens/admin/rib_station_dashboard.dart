@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -27,12 +28,23 @@ class _RibStationDashboardState extends State<RibStationDashboard>
   int? _userId;
   Map<String, dynamic> _notificationStats = {};
   bool _isLoading = true;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
     _initializeData();
+    _startAutoRefresh();
+  }
+
+  void _startAutoRefresh() {
+    // Auto-refresh every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        _loadStatistics();
+      }
+    });
   }
 
   Future<void> _initializeData() async {
@@ -189,26 +201,63 @@ class _RibStationDashboardState extends State<RibStationDashboard>
 
   Future<void> _logout() async {
     try {
+      // Cancel auto-refresh timer
+      _refreshTimer?.cancel();
+      
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+      
       final authService = AuthService();
       await authService.logout();
+      
+      // Close loading dialog
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.of(context).pop();
+        
+        // Navigate to login screen
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login',
+          (route) => false,
+        );
+        
+        // Show success message
+        Fluttertoast.showToast(
+          msg: 'Logged out successfully',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.successColor,
+          textColor: Colors.white,
+        );
       }
     } catch (e) {
       debugPrint('Error during logout: $e');
-      Fluttertoast.showToast(
-        msg: 'Error during logout: $e',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: AppColors.errorColor,
-        textColor: Colors.white,
-      );
+      
+      // Close loading dialog if still open
+      if (mounted) {
+        Navigator.of(context).pop();
+        
+        // Show error message
+        Fluttertoast.showToast(
+          msg: 'Error during logout. Please try again.',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.errorColor,
+          textColor: Colors.white,
+        );
+      }
     }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -229,12 +278,34 @@ class _RibStationDashboardState extends State<RibStationDashboard>
         elevation: 0,
         actions: [
           IconButton(
-            onPressed: () {
-              _loadUserInfo();
-              _loadStatistics();
+            onPressed: _isLoading ? null : () async {
+              setState(() {
+                _isLoading = true;
+              });
+              await _loadUserInfo();
+              await _loadStatistics();
+              setState(() {
+                _isLoading = false;
+              });
+              Fluttertoast.showToast(
+                msg: 'Data refreshed successfully',
+                toastLength: Toast.LENGTH_SHORT,
+                gravity: ToastGravity.BOTTOM,
+                backgroundColor: AppColors.successColor,
+                textColor: Colors.white,
+              );
             },
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            tooltip: 'Refresh',
+            icon: _isLoading 
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh, color: Colors.white),
+            tooltip: _isLoading ? 'Refreshing...' : 'Refresh Data',
           ),
           IconButton(
             onPressed: _logout,

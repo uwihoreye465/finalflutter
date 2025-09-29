@@ -28,22 +28,87 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _selectedSector;
+
+  // All RIB Stations in Rwanda
+  final List<String> _ribStations = [
+    'Bugesera STATIONS',
+    'Gatsibo STATIONS',
+    'Kayonza STATIONS',
+    'Kirehe STATIONS',
+    'Ngoma STATIONS',
+    'Nyagatare STATIONS',
+    'Rwamagana STATIONS',
+    'Gasabo STATIONS',
+    'Kicukiro STATIONS',
+    'Nyarugenge STATIONS',
+    'Burera STATIONS',
+    'Gakenke STATIONS',
+    'Gicumbi STATIONS',
+    'Musanze STATIONS',
+    'Rulindo STATIONS',
+    'Gisagara STATIONS',
+    'Huye STATIONS',
+    'Kamonyi STATIONS',
+    'Muhanga STATIONS',
+    'Nyamagabe STATIONS',
+    'Nyanza STATIONS',
+    'Nyaruguru STATIONS',
+    'Ruhango STATIONS',
+    'Karongi STATIONS',
+    'Ngororero STATIONS',
+    'Nyabihu STATIONS',
+    'Nyamasheke STATIONS',
+    'Rubavu STATIONS',
+    'Rusizi STATIONS',
+    'Rutsiro STATIONS',
+    'Other (Please specify)',
+  ];
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Validate sector selection
+    if (_selectedSector == null) {
+      Fluttertoast.showToast(
+        msg: 'Please select a RIB Station',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: AppColors.errorColor,
+        textColor: Colors.white,
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
     try {
+      // Use selected sector or custom input
+      String sector = _selectedSector!;
+      if (_selectedSector == 'Other (Please specify)') {
+        sector = _sectorController.text.trim();
+        if (sector.isEmpty) {
+          Fluttertoast.showToast(
+            msg: 'Please specify the RIB Station name',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: AppColors.errorColor,
+            textColor: Colors.white,
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
       final userData = {
-        'sector': _sectorController.text.trim(),
+        'sector': sector,
         'fullname': _fullnameController.text.trim(),
         'position': _positionController.text.trim(),
         'email': _emailController.text.trim(),
         'password': _passwordController.text,
-        'role': 'staff', // Default role
+        'role': 'staff', // Default role for all registrations
       };
 
       await ApiService.register(userData);
@@ -127,12 +192,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   
                   const SizedBox(height: 30),
                   
-                  // Sector Field
-                  CustomTextField(
-                    controller: _sectorController,
-                    hintText: 'Enter Sector',
-                    validator: Validators.validateRequired,
+                  // RIB Station Selection
+                  DropdownButtonFormField<String>(
+                    value: _selectedSector,
+                    decoration: InputDecoration(
+                      labelText: 'Select RIB Station *',
+                      hintText: 'Choose your RIB Station',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.primaryColor),
+                      ),
+                      prefixIcon: const Icon(Icons.location_on, color: AppColors.primaryColor),
+                    ),
+                    items: _ribStations.map((String station) {
+                      return DropdownMenuItem<String>(
+                        value: station,
+                        child: Text(station),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedSector = newValue;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a RIB Station';
+                      }
+                      return null;
+                    },
                   ),
+                  
+                  // Custom Sector Input (only shown if "Other" is selected)
+                  if (_selectedSector == 'Other (Please specify)')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 15),
+                      child: CustomTextField(
+                        controller: _sectorController,
+                        hintText: 'Enter RIB Station Name',
+                        labelText: 'RIB Station Name',
+                        validator: (value) {
+                          if (_selectedSector == 'Other (Please specify)') {
+                            return Validators.validateRequired(value);
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
                   
                   const SizedBox(height: 15),
                   

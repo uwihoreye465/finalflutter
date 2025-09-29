@@ -89,9 +89,8 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
     try {
       await AuthService().logout();
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login',
           (route) => false,
         );
         Fluttertoast.showToast(

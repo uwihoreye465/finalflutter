@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
@@ -29,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = false;
   String _detectedIdType = 'indangamuntu_yumunyarwanda';
+  Timer? _searchTimer;
 
   bool _looksLikePassport(String input) {
     // Passport: not strictly 16 digits; letters allowed
@@ -84,12 +86,29 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _performSearchWithDebounce(String value) {
+    // Cancel previous timer
+    _searchTimer?.cancel();
+    
+    // Only search if we have enough characters
+    if (value.trim().length < 8) {
+      return;
+    }
+    
+    // Start new timer for debounced search
+    _searchTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _searchCriminal();
+      }
+    });
+  }
+
   void _showCriminalFoundDialog(CriminalRecord criminalRecord) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text(
-          'WAHUNZE UBUTABERA',
+          'WAHUNZE UBUTABERA(you are escaped Justice)',
           style: TextStyle(
             color: AppColors.errorColor,
             fontWeight: FontWeight.bold,
@@ -110,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text('Description: ${criminalRecord.description}'),
               const SizedBox(height: 16),
               const Text(
-                'This person has a criminal record. Would you like to send an alert to RIB?',
+                'This person has a Escaped justice. Would you like to send an alert to RIB?',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -142,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text(
-          'Uri umwere ntago wahunze ubutabera',
+          'Uri umwere ntago wahunze ubutabera(you are not escaped Justice)',
           style: TextStyle(
             color: AppColors.successColor,
             fontWeight: FontWeight.bold,
@@ -442,6 +461,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         onSelected: (value) async {
                           if (value == 'logout') {
                             await authService.logout();
+                            // Navigate to login screen
+                            if (mounted) {
+                              Navigator.of(context).pushNamedAndRemoveUntil(
+                                '/login',
+                                (route) => false,
+                              );
+                            }
                             // Show logout confirmation
                             Fluttertoast.showToast(
                               msg: 'Logged out successfully',
@@ -604,10 +630,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             onSubmitted: (_) => _searchCriminal(),
                             onChanged: (value) {
                               setState(() {}); // Update UI to show/hide clear button
-                              // Auto-search when non-passport reaches 16 digits
-                              if (value.trim().length == 16 && !_looksLikePassport(value.trim())) {
-                                _searchCriminal();
-                              }
+                              // Perform debounced search
+                              _performSearchWithDebounce(value);
                             },
                             textInputAction: TextInputAction.search,
                             keyboardType: TextInputType.text,
@@ -685,6 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchTimer?.cancel();
     super.dispose();
   }
 }

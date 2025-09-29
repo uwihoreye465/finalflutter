@@ -35,6 +35,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   String _selectedRoleFilter = 'all';
   String _selectedApprovalFilter = 'all';
   List<User> _filteredUsers = [];
+  final TextEditingController _searchController = TextEditingController();
   
   // User statistics
   int _totalUsers = 0;

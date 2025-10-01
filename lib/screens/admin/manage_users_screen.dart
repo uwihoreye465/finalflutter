@@ -40,6 +40,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   // User statistics
   int _totalUsers = 0;
   int _pendingUsers = 0;
+  String _loadingMessage = 'Loading users...';
 
   @override
   void initState() {
@@ -60,19 +61,120 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   Future<void> _loadUsers() async {
     setState(() {
       _isLoading = true;
+      _loadingMessage = 'Loading users...';
     });
 
     try {
-      final response = await ApiService.getUsersAdmin();
-      if (response['success'] == true) {
-        final usersData = response['data']['users'] as List;
+      // Try multiple approaches to get all users
+      Map<String, dynamic> response;
+      List usersData = [];
+      
+      // First try: getUsersAdmin (no pagination)
+      setState(() {
+        _loadingMessage = 'Fetching users from admin endpoint...';
+      });
+      
+      try {
+        response = await ApiService.getUsersAdmin();
+        print('getUsersAdmin Response: $response');
+        
+        if (response['success'] == true) {
+          if (response['data'] != null && response['data']['users'] != null) {
+            usersData = response['data']['users'] as List;
+          } else if (response['data'] != null && response['data'] is List) {
+            usersData = response['data'] as List;
+          } else if (response['users'] != null) {
+            usersData = response['users'] as List;
+          }
+        }
+      } catch (e) {
+        print('getUsersAdmin failed: $e');
+      }
+      
+      // If we got less than 10 users, try with pagination and high limit
+      if (usersData.length < 10) {
+        setState(() {
+          _loadingMessage = 'Fetching all users with pagination...';
+        });
+        
+        try {
+          response = await ApiService.getUsers(page: 1, limit: 1000);
+          print('getUsers Response: $response');
+          
+          if (response['success'] == true) {
+            List newUsersData = [];
+            if (response['data'] != null && response['data']['users'] != null) {
+              newUsersData = response['data']['users'] as List;
+            } else if (response['data'] != null && response['data'] is List) {
+              newUsersData = response['data'] as List;
+            } else if (response['users'] != null) {
+              newUsersData = response['users'] as List;
+            }
+            
+            if (newUsersData.length > usersData.length) {
+              usersData = newUsersData;
+            }
+            
+            // Check if there are more pages
+            if (response['pagination'] != null) {
+              int totalPages = response['pagination']['totalPages'] ?? 1;
+              int currentPage = response['pagination']['currentPage'] ?? 1;
+              
+              print('Pagination info: currentPage=$currentPage, totalPages=$totalPages');
+              
+              // If there are more pages, fetch them
+              if (currentPage < totalPages) {
+                for (int page = 2; page <= totalPages; page++) {
+                  setState(() {
+                    _loadingMessage = 'Fetching page $page of $totalPages...';
+                  });
+                  
+                  try {
+                    final pageResponse = await ApiService.getUsers(page: page, limit: 1000);
+                    if (pageResponse['success'] == true) {
+                      List pageUsersData = [];
+                      if (pageResponse['data'] != null && pageResponse['data']['users'] != null) {
+                        pageUsersData = pageResponse['data']['users'] as List;
+                      } else if (pageResponse['data'] != null && pageResponse['data'] is List) {
+                        pageUsersData = pageResponse['data'] as List;
+                      } else if (pageResponse['users'] != null) {
+                        pageUsersData = pageResponse['users'] as List;
+                      }
+                      usersData.addAll(pageUsersData);
+                      print('Fetched page $page: ${pageUsersData.length} users');
+                    }
+                  } catch (e) {
+                    print('Failed to fetch page $page: $e');
+                    break; // Stop trying if we hit an error
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          print('getUsers failed: $e');
+        }
+      }
+      
+      print('Final users count: ${usersData.length}');
+      
+      if (usersData.isNotEmpty) {
         setState(() {
           _users = usersData.map((userData) => User.fromJson(userData)).toList();
           _calculateStatistics();
           _applyFilters();
         });
+      } else {
+        Fluttertoast.showToast(
+          msg: 'No users found',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: AppColors.warningColor,
+          textColor: Colors.white,
+        );
       }
     } catch (e) {
+      print('Error loading users: $e');
       Fluttertoast.showToast(
         msg: 'Error loading users: $e',
         toastLength: Toast.LENGTH_SHORT,
@@ -88,8 +190,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   }
 
   void _calculateStatistics() {
-    _totalUsers = _users.length;
-    _pendingUsers = _users.where((user) => user.isApproved == false).length;
+    setState(() {
+      _totalUsers = _users.length;
+      _pendingUsers = _users.where((user) => user.isApproved == false).length;
+    });
   }
 
 
@@ -430,7 +534,20 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
-          ? const LoadingWidget()
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const LoadingWidget(),
+                const SizedBox(height: 16),
+                Text(
+                  _loadingMessage,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: AppColors.primaryColor,
+                  ),
+                ),
+              ],
+            )
           : Column(
               children: [
                 // Statistics Section
@@ -445,49 +562,49 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                       bottom: BorderSide(color: Colors.grey[300]!),
                     ),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _selectedRoleFilter,
-                          decoration: const InputDecoration(
-                            labelText: 'Filter by Role',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'all', child: Text('All Roles')),
-                            DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                            DropdownMenuItem(value: 'staff', child: Text('Staff')),
-                            DropdownMenuItem(value: 'near_rib', child: Text('RIB Station Officer')),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedRoleFilter = value!;
-                              _applyFilters();
-                            });
-                          },
+                      // First row - Role filter
+                      DropdownButtonFormField<String>(
+                        value: _selectedRoleFilter,
+                        decoration: const InputDecoration(
+                          labelText: 'Filter by Role',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
+                        items: const [
+                          DropdownMenuItem(value: 'all', child: Text('All Roles')),
+                          DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                          DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                          DropdownMenuItem(value: 'near_rib', child: Text('RIB Station Officer')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedRoleFilter = value!;
+                            _applyFilters();
+                          });
+                        },
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _selectedApprovalFilter,
-                          decoration: const InputDecoration(
-                            labelText: 'Filter by Status',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'all', child: Text('All Users')),
-                            DropdownMenuItem(value: 'approved', child: Text('Approved')),
-                            DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedApprovalFilter = value!;
-                              _applyFilters();
-                            });
-                          },
+                      const SizedBox(height: 12),
+                      // Second row - Status filter
+                      DropdownButtonFormField<String>(
+                        value: _selectedApprovalFilter,
+                        decoration: const InputDecoration(
+                          labelText: 'Filter by Status',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
+                        items: const [
+                          DropdownMenuItem(value: 'all', child: Text('All Users')),
+                          DropdownMenuItem(value: 'approved', child: Text('Approved')),
+                          DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedApprovalFilter = value!;
+                            _applyFilters();
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -576,13 +693,24 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'User Statistics',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primaryColor,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'User Statistics',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryColor,
+                ),
+              ),
+              IconButton(
+                onPressed: _loadUsers,
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Refresh Users',
+                color: AppColors.primaryColor,
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Row(

@@ -93,6 +93,9 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
       // Process victims statistics
       if (results[2]['success'] == true) {
         _victimStats = results[2]['data'];
+        debugPrint('Victims stats: $_victimStats');
+      } else {
+        debugPrint('Victims stats failed: ${results[2]['message']}');
       }
 
       // Process notifications statistics (admin format)
@@ -391,17 +394,17 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
 
   Widget _buildOverviewTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Summary Cards
           _buildSummaryCards(),
-          const SizedBox(height: 26),
+          const SizedBox(height: 32),
           
           // Quick Stats
           _buildQuickStats(),
-          const SizedBox(height: 26),
+          const SizedBox(height: 32),
           
           // Recent Activity
           _buildRecentActivity(),
@@ -411,80 +414,99 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
   }
 
   Widget _buildSummaryCards() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.5,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      children: [
-        _buildStatCard(
-          'Total Criminals', 
-          _criminalStats['overview']?['total_criminals'] ?? '0', 
-          Icons.person, 
-          AppColors.errorColor
-        ),
-        _buildStatCard(
-          'Arrested', 
-          _arrestedStats['totalArrests']?.toString() ?? '0', 
-          Icons.gavel, 
-          AppColors.warningColor
-        ),
-        _buildStatCard(
-          'Victims', 
-          _victimStats['overview']?['total_victims'] ?? '0', 
-          Icons.people, 
-          AppColors.infoColor
-        ),
-        _buildStatCard(
-          'Notifications', 
-          (_notificationStats['overall_statistics']?['total_messages'] ?? 0).toString(), 
-          Icons.notifications, 
-          AppColors.primaryColor
-        ),
-      ],
+    return SizedBox(
+      height: 80, // Fixed height to prevent overflow
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.45,
+            child: _buildStatCard(
+              'Total Criminals', 
+              _criminalStats['overview']?['total_criminals'] ?? '0', 
+              Icons.person, 
+              AppColors.errorColor
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.45,
+            child: _buildStatCard(
+              'Arrested', 
+              _arrestedStats['totalArrests']?.toString() ?? '0', 
+              Icons.gavel, 
+              AppColors.warningColor
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.45,
+            child: _buildStatCard(
+              'Victims', 
+              _victimStats['overview']?['total_victims']?.toString() ?? 
+              _victimStats['total_victims']?.toString() ?? 
+              _victimStats['total']?.toString() ?? 
+              '0', 
+              Icons.people, 
+              AppColors.infoColor
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.45,
+            child: _buildStatCard(
+              'Notifications', 
+              (_notificationStats['overall_statistics']?['total_messages'] ?? 0).toString(), 
+              Icons.notifications, 
+              AppColors.primaryColor
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildStatCard(String title, String count, IconData icon, Color color) {
+    // Ensure count is never empty or null
+    final displayCount = count.isEmpty || count == 'null' ? '0' : count;
+    
     return Card(
-      elevation: 4,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+      ),
       child: Container(
-        height: 120,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(4),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 28, color: color),
-            const SizedBox(height: 6),
-            Flexible(
-              child: Text(
-                count,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Icon(icon, size: 12, color: color),
+            const SizedBox(height: 2),
+            Text(
+              displayCount,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: color,
+                height: 1.0,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
-            Flexible(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+            const SizedBox(height: 1),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 7,
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+                height: 1.0,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -494,16 +516,20 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
 
   Widget _buildQuickStats() {
     return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Quick Statistics',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             if (_criminalStats['overview'] != null) ...[
               _buildStatRow('Male Criminals', _criminalStats['overview']['male_criminals']),
               _buildStatRow('Female Criminals', _criminalStats['overview']['female_criminals']),
@@ -522,17 +548,26 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
 
   Widget _buildStatRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
           ),
           Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: AppColors.primaryColor,
+            ),
           ),
         ],
       ),
@@ -543,18 +578,25 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
     final recentActivity = _criminalStats['recentActivity'] as List? ?? [];
     
     return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Recent Criminal Activity',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             if (recentActivity.isEmpty)
-              const Text('No recent activity')
+              const Text(
+                'No recent activity',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              )
             else
               ...recentActivity.take(5).map((activity) => _buildActivityItem(activity)),
           ],
@@ -565,36 +607,47 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
 
   Widget _buildActivityItem(Map<String, dynamic> activity) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: 12,
+            height: 12,
             decoration: const BoxDecoration(
               color: AppColors.errorColor,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '${activity['first_name']} ${activity['last_name']}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   '${activity['crime_type']} - ${activity['province'] ?? 'Unknown Province'}',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
           ),
           Text(
             activity['created_at']?.split('T')[0] ?? '',
-            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            style: TextStyle(
+              color: Colors.grey[500], 
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -603,21 +656,21 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
 
   Widget _buildCriminalsTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Crime Types Chart
           _buildCrimeTypesChart(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           
           // Province Distribution Chart
           _buildProvinceChart(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           
           // District Distribution Chart
           _buildDistrictChart(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           
           // Monthly Trends Chart
           _buildMonthlyTrendsChart(),
@@ -628,17 +681,17 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
 
   Widget _buildArrestedTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Arrest Statistics Chart
           _buildArrestStatsChart(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           
           // Arrests by Location
           _buildArrestsByLocationChart(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           
           // Top Officers
           _buildTopOfficers(),
@@ -649,13 +702,13 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
 
   Widget _buildNotificationsTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Notification Statistics
           _buildNotificationStats(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           
           // RIB Statistics
           _buildRibStatistics(),

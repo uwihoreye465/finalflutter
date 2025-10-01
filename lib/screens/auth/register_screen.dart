@@ -192,55 +192,142 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   
                   const SizedBox(height: 30),
                   
-                  // RIB Station Selection
-                  DropdownButtonFormField<String>(
-                    value: _selectedSector,
-                    decoration: InputDecoration(
-                      labelText: 'Select RIB Station *',
-                      hintText: 'Choose your RIB Station',
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.primaryColor),
-                      ),
-                      prefixIcon: const Icon(Icons.location_on, color: AppColors.primaryColor),
+                  // RIB Station Selection - Beautiful Searchable Dropdown
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
                     ),
-                    items: _ribStations.map((String station) {
-                      return DropdownMenuItem<String>(
-                        value: station,
-                        child: Text(station),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedSector = newValue;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please select a RIB Station';
-                      }
-                      return null;
-                    },
+                    child: DropdownSearch<String>(
+                      popupProps: PopupProps.menu(
+                        showSearchBox: true,
+                        searchFieldProps: TextFieldProps(
+                          decoration: InputDecoration(
+                            hintText: 'Search RIB Station...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
+                            ),
+                          ),
+                        ),
+                        menuProps: MenuProps(
+                          backgroundColor: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          elevation: 8,
+                          shadowColor: Colors.black.withOpacity(0.2),
+                        ),
+                        itemBuilder: (context, item, isSelected) {
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppColors.primaryColor.withOpacity(0.1) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: ListTile(
+                              title: Text(
+                                item,
+                                style: TextStyle(
+                                  color: isSelected ? AppColors.primaryColor : Colors.black87,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              trailing: isSelected
+                                  ? Icon(
+                                      Icons.check_circle,
+                                      color: AppColors.primaryColor,
+                                      size: 20,
+                                    )
+                                  : null,
+                            ),
+                          );
+                        },
+                      ),
+                      items: _ribStations,
+                      dropdownDecoratorProps: DropDownDecoratorProps(
+                        dropdownSearchDecoration: InputDecoration(
+                          labelText: 'Select RIB Station *',
+                          hintText: 'Choose your RIB Station',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
+                          ),
+                          suffixIcon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryColor),
+                        ),
+                      ),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _selectedSector = newValue;
+                        });
+                      },
+                      selectedItem: _selectedSector,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a RIB Station';
+                        }
+                        return null;
+                      },
+                    ),
                   ),
                   
                   // Custom Sector Input (only shown if "Other" is selected)
                   if (_selectedSector == 'Other (Please specify)')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 15),
-                      child: CustomTextField(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      margin: const EdgeInsets.only(top: 15),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: TextFormField(
                         controller: _sectorController,
-                        hintText: 'Enter RIB Station Name',
-                        labelText: 'RIB Station Name',
+                        decoration: InputDecoration(
+                          labelText: 'RIB Station Name *',
+                          hintText: 'Enter RIB Station Name',
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            borderSide: BorderSide(color: AppColors.primaryColor, width: 2),
+                          ),
+                        ),
                         validator: (value) {
                           if (_selectedSector == 'Other (Please specify)') {
                             return Validators.validateRequired(value);
@@ -255,7 +342,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Full Name Field
                   CustomTextField(
                     controller: _fullnameController,
-                    hintText: 'Enter Fullname',
+                    hintText: 'Enter Full Name',
+                    labelText: 'Full Name *',
                     validator: Validators.validateRequired,
                   ),
                   
@@ -265,6 +353,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   CustomTextField(
                     controller: _positionController,
                     hintText: 'Enter Position',
+                    labelText: 'Position *',
                     validator: Validators.validateRequired,
                   ),
                   
@@ -274,6 +363,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   CustomTextField(
                     controller: _emailController,
                     hintText: 'Enter your Email',
+                    labelText: 'Email Address *',
                     keyboardType: TextInputType.emailAddress,
                     validator: Validators.validateEmail,
                   ),
@@ -284,11 +374,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   CustomTextField(
                     controller: _passwordController,
                     hintText: 'Enter your Password',
+                    labelText: 'Password *',
                     obscureText: _obscurePassword,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                        color: Colors.grey,
+                        color: const Color(0xFF2196F3),
                       ),
                       onPressed: () {
                         setState(() {
@@ -312,14 +403,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             text: 'Register',
                             onPressed: _register,
                             backgroundColor: AppColors.successColor,
+                            borderRadius: 15,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 15),
                         Expanded(
                           child: CustomButton(
                             text: 'Cancel',
                             onPressed: () => Navigator.pop(context),
                             backgroundColor: AppColors.errorColor,
+                            borderRadius: 15,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],

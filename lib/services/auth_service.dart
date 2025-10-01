@@ -119,8 +119,6 @@ class AuthService with ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      debugPrint('Starting logout process...');
-      
       // Clear session
       if (_sessionManager != null) {
         await _sessionManager!.clearSession();
@@ -138,10 +136,8 @@ class AuthService with ChangeNotifier {
       _isAuthenticated = false;
       _isLoading = false;
       
-      debugPrint('Logout completed successfully');
       notifyListeners();
     } catch (e) {
-      debugPrint('Error during logout: $e');
       // Even if there's an error, clear the state
       _user = null;
       _token = null;

@@ -93,7 +93,6 @@ class _EnhancedAdminDashboardState extends State<EnhancedAdminDashboard> with Si
         textColor: Colors.white,
       );
     } catch (e) {
-      debugPrint('Refresh error: $e');
       Fluttertoast.showToast(
         msg: '❌ Error refreshing data: $e',
         toastLength: Toast.LENGTH_SHORT,

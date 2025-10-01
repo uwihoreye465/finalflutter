@@ -78,6 +78,9 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
   // Auto-filled data references
   RwandanCitizen? _autofilledCitizen;
   PassportHolder? _autofilledPassportHolder;
+  
+  // Province detection
+  String? _detectedProvince;
 
   @override
   void initState() {
@@ -135,8 +138,68 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
     super.dispose();
   }
 
+  // Validate ID number based on type and rules
+  String? _validateIdNumber(String idNumber, String? idType) {
+    if (idNumber.isEmpty) return 'Please enter ID number';
+    
+    if (idType == 'passport') {
+      if (idNumber.length != 9) {
+        return 'Passport number must be exactly 9 characters';
+      }
+    } else {
+      if (idNumber.length != 16) {
+        return 'ID number must be exactly 16 digits';
+      }
+      
+      // Check ID type based on first digit
+      String firstDigit = idNumber.substring(0, 1);
+      if (idType == 'indangamuntu_yumunyarwanda' && firstDigit != '1') {
+        return 'Rwandan ID must start with 1';
+      } else if (idType == 'indangamuntu_yumunyamahanga' && firstDigit != '3') {
+        return 'Foreign ID must start with 3';
+      } else if (idType == 'indangampunzi' && firstDigit != '2') {
+        return 'Refugee ID must start with 2';
+      }
+    }
+    
+    return null;
+  }
+  
+  // Detect province from ID number
+  void _detectProvinceFromId(String idNumber) {
+    if (idNumber.length >= 2) {
+      String provinceCode = idNumber.substring(1, 3);
+      Map<String, String> provinceMap = {
+        '01': 'Kigali City',
+        '02': 'Eastern Province',
+        '03': 'Northern Province',
+        '04': 'Western Province',
+        '05': 'Southern Province',
+      };
+      
+      setState(() {
+        _detectedProvince = provinceMap[provinceCode];
+      });
+    }
+  }
+
   Future<void> _searchAndAutofill(String idNumber) async {
     if (idNumber.length < 8) return;
+    
+    // Validate ID number first
+    String? validationError = _validateIdNumber(idNumber, _selectedIdType);
+    if (validationError != null) {
+      setState(() {
+        _nidaMessage = validationError;
+        _nidaMessageType = 'error';
+      });
+      return;
+    }
+    
+    // Detect province for citizens
+    if (_selectedIdType != 'passport' && idNumber.length >= 3) {
+      _detectProvinceFromId(idNumber);
+    }
 
     try {
       final response = await ApiService.searchPersonData(idNumber);
@@ -341,12 +404,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
         crimeType: _selectedCrimeType!,
         evidence: {
           'description': _evidenceDescriptionController.text.trim().isEmpty ? 'No description provided' : _evidenceDescriptionController.text.trim(),
-          'files': _selectedFiles.map((file) => {
-            'name': file.name,
-            'path': file.path,
-            'size': 0, // Will be updated when file is actually uploaded
-            'type': file.name.split('.').last.toLowerCase(),
-          }).toList(),
+          'files': [], // No file upload functionality
           'uploadedAt': DateTime.now().toIso8601String(),
         },
         dateCommitted: _selectedDateCommitted,
@@ -521,6 +579,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       _isAutofilledData = false;
       _autofilledCitizen = null;
       _autofilledPassportHolder = null;
+      _detectedProvince = null;
       _selectedFiles.clear();
     });
   }
@@ -645,104 +704,18 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
             
             const SizedBox(height: 16),
             
-            // Evidence Section
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Evidence*',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                
-                // Evidence Description
-                CustomTextField(
-                  controller: _evidenceDescriptionController,
-                  hintText: 'Describe the evidence...',
-                  label: 'Evidence Description',
-                  maxLines: 3,
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // File Upload Section
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _pickFiles,
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Upload Files'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryColor,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      '${_selectedFiles.length} file(s) selected',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textColor,
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // Selected Files List
-                if (_selectedFiles.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Selected Files:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ..._selectedFiles.asMap().entries.map((entry) {
-                          int index = entry.key;
-                          XFile file = entry.value;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.attach_file, size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    file.name,
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () => _removeFile(index),
-                                  icon: const Icon(Icons.close, size: 16),
-                                  color: AppColors.errorColor,
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+            // Evidence Description Only (no file upload)
+            CustomTextField(
+              controller: _evidenceDescriptionController,
+              hintText: 'Describe the evidence...',
+              label: 'Evidence Description*',
+              maxLines: 3,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please describe the evidence';
+                }
+                return null;
+              },
             ),
             
             const SizedBox(height: 30),
@@ -754,7 +727,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
               CustomButton(
                 text: 'Submit Victim Report',
                 onPressed: _submitVictim,
-                backgroundColor: AppColors.errorColor,
+                backgroundColor: Colors.blue,
               ),
           ],
         ),
@@ -832,7 +805,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
               CustomButton(
                 text: 'Submit Criminal Report',
                 onPressed: _submitCriminal,
-                backgroundColor: AppColors.primaryColor,
+                backgroundColor: Colors.blue,
               ),
           ],
         ),
@@ -865,16 +838,11 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       Row(
         children: [
           Expanded(
-            child: CustomTextField(
+            child:             CustomTextField(
               controller: _idNumberController,
               hintText: 'Enter ID Number',
               label: 'ID Number',
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter ID number';
-                }
-                return null;
-              },
+              validator: (value) => _validateIdNumber(value ?? '', _selectedIdType),
               onChanged: _searchAndAutofill,
             ),
           ),
@@ -926,11 +894,12 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       ),
       const SizedBox(height: 16),
       
-      // First Name
+      // First Name (disabled if auto-filled)
       CustomTextField(
         controller: _firstNameController,
         hintText: 'Enter First Name',
         label: 'First Name',
+        enabled: !_isAutofilledData,
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Please enter first name';
@@ -941,11 +910,12 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       
       const SizedBox(height: 16),
       
-      // Last Name
+      // Last Name (disabled if auto-filled)
       CustomTextField(
         controller: _lastNameController,
         hintText: 'Enter Last Name',
         label: 'Last Name',
+        enabled: !_isAutofilledData,
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Please enter last name';
@@ -956,32 +926,41 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       
       const SizedBox(height: 16),
       
-      // Gender
-      DropdownSearch<String>(
-        items: AppConstants.genderOptions,
-        dropdownDecoratorProps: const DropDownDecoratorProps(
-          dropdownSearchDecoration: InputDecoration(
-            labelText: "Select Gender",
-            border: OutlineInputBorder(),
+      // Gender (read-only text if auto-filled, dropdown if not)
+      _isAutofilledData 
+        ? CustomTextField(
+            controller: TextEditingController(text: _selectedGender ?? ''),
+            hintText: 'Gender',
+            label: 'Gender',
+            enabled: false,
+            validator: (value) => value == null || value.isEmpty ? 'Please select gender' : null,
+          )
+        : DropdownSearch<String>(
+            items: AppConstants.genderOptions,
+            dropdownDecoratorProps: const DropDownDecoratorProps(
+              dropdownSearchDecoration: InputDecoration(
+                labelText: "Select Gender",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            onChanged: (value) {
+              setState(() => _selectedGender = value);
+            },
+            selectedItem: _selectedGender,
+            validator: (value) => value == null ? 'Please select gender' : null,
           ),
-        ),
-        onChanged: (value) {
-          setState(() => _selectedGender = value);
-        },
-        selectedItem: _selectedGender,
-        validator: (value) => value == null ? 'Please select gender' : null,
-      ),
       
       const SizedBox(height: 16),
       
-      // Date of Birth
+      // Date of Birth (disabled if auto-filled)
       GestureDetector(
-        onTap: () => _selectDate(context, isDateOfBirth: true),
+        onTap: _isAutofilledData ? null : () => _selectDate(context, isDateOfBirth: true),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey),
             borderRadius: BorderRadius.circular(8),
+            color: _isAutofilledData ? Colors.grey[100] : null,
           ),
           child: Row(
             children: [
@@ -1003,20 +982,27 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       
       const SizedBox(height: 16),
       
-      // Marital Status
-      DropdownSearch<String>(
-        items: AppConstants.maritalStatusOptions,
-        dropdownDecoratorProps: const DropDownDecoratorProps(
-          dropdownSearchDecoration: InputDecoration(
-            labelText: "Marital Status",
-            border: OutlineInputBorder(),
+      // Marital Status (read-only text if auto-filled, dropdown if not)
+      _isAutofilledData 
+        ? CustomTextField(
+            controller: TextEditingController(text: _selectedMaritalStatus ?? ''),
+            hintText: 'Marital Status',
+            label: 'Marital Status',
+            enabled: false,
+          )
+        : DropdownSearch<String>(
+            items: AppConstants.maritalStatusOptions,
+            dropdownDecoratorProps: const DropDownDecoratorProps(
+              dropdownSearchDecoration: InputDecoration(
+                labelText: "Marital Status",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            onChanged: (value) {
+              setState(() => _selectedMaritalStatus = value);
+            },
+            selectedItem: _selectedMaritalStatus,
           ),
-        ),
-        onChanged: (value) {
-          setState(() => _selectedMaritalStatus = value);
-        },
-        selectedItem: _selectedMaritalStatus,
-      ),
       
       const SizedBox(height: 16),
       
@@ -1031,12 +1017,39 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
       ),
       const SizedBox(height: 16),
       
+      // Province Display (for citizens)
+      if (_selectedIdType != 'passport' && _detectedProvince != null) ...[
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            border: Border.all(color: Colors.blue),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.location_on, color: Colors.blue, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Detected Province: $_detectedProvince',
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+      
       if (_selectedIdType == 'passport') ...[
-        // Passport holder fields
+        // Passport holder fields (disabled if auto-filled)
         CustomTextField(
           controller: _countryController,
           hintText: 'Enter Country',
           label: 'Country',
+          enabled: !_isAutofilledData,
         ),
         const SizedBox(height: 16),
         
@@ -1044,6 +1057,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
           controller: _nationalityController,
           hintText: 'Enter Nationality',
           label: 'Nationality',
+          enabled: !_isAutofilledData,
         ),
         const SizedBox(height: 16),
         
@@ -1052,28 +1066,37 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
           hintText: 'Enter Home Address',
           label: 'Home Address',
           maxLines: 2,
+          enabled: !_isAutofilledData,
         ),
         const SizedBox(height: 16),
       ] else ...[
-        // Citizen fields
-        DropdownSearch<String>(
-          items: AppConstants.provinces,
-          dropdownDecoratorProps: const DropDownDecoratorProps(
-            dropdownSearchDecoration: InputDecoration(
-              labelText: "Province",
-              border: OutlineInputBorder(),
+        // Province (read-only text if auto-filled, dropdown if not)
+        _isAutofilledData 
+          ? CustomTextField(
+              controller: TextEditingController(text: _provinceController.text),
+              hintText: 'Province',
+              label: 'Province',
+              enabled: false,
+            )
+          : DropdownSearch<String>(
+              items: AppConstants.provinces,
+              dropdownDecoratorProps: const DropDownDecoratorProps(
+                dropdownSearchDecoration: InputDecoration(
+                  labelText: "Province",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              onChanged: (value) {
+                _provinceController.text = value ?? '';
+              },
             ),
-          ),
-          onChanged: (value) {
-            _provinceController.text = value ?? '';
-          },
-        ),
         const SizedBox(height: 16),
         
         CustomTextField(
           controller: _districtController,
           hintText: 'Enter District',
           label: 'District',
+          enabled: !_isAutofilledData,
         ),
         const SizedBox(height: 16),
         
@@ -1081,6 +1104,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
           controller: _sectorController,
           hintText: 'Enter Sector',
           label: 'Sector',
+          enabled: !_isAutofilledData,
         ),
         const SizedBox(height: 16),
         
@@ -1088,6 +1112,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
           controller: _cellController,
           hintText: 'Enter Cell',
           label: 'Cell',
+          enabled: !_isAutofilledData,
         ),
         const SizedBox(height: 16),
         
@@ -1095,6 +1120,7 @@ class _EnhancedReportScreenState extends State<EnhancedReportScreen> with Single
           controller: _villageController,
           hintText: 'Enter Village',
           label: 'Village',
+          enabled: !_isAutofilledData,
         ),
         const SizedBox(height: 16),
       ],

@@ -216,7 +216,7 @@ class _RibStationDashboardState extends State<RibStationDashboard>
       final authService = AuthService();
       await authService.logout();
       
-      // Close loading dialog
+      // Close loading dialog safely
       if (mounted) {
         Navigator.of(context).pop();
         
@@ -236,11 +236,13 @@ class _RibStationDashboardState extends State<RibStationDashboard>
         );
       }
     } catch (e) {
-      debugPrint('Error during logout: $e');
-      
-      // Close loading dialog if still open
+      // Close loading dialog safely if still open
       if (mounted) {
-        Navigator.of(context).pop();
+        try {
+          Navigator.of(context).pop();
+        } catch (popError) {
+          // Dialog might already be closed, ignore error
+        }
         
         // Show error message
         Fluttertoast.showToast(

@@ -378,17 +378,25 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
     }
 
     void _editCriminalRecord(CriminalRecord record) {
+      // Enable editing functionality - populate form with existing data
       setState(() {
         _isEditMode = true;
         _editingRecord = record;
-        _idNumberController.text = record.idNumber;
-        _firstNameController.text = record.firstName;
-        _lastNameController.text = record.lastName;
-        _selectedGender = record.gender;
-        _selectedDateOfBirth = record.dateOfBirth;
-        _selectedMaritalStatus = record.maritalStatus;
+        
+        
+        // Populate form fields with existing data
         _selectedIdType = record.idType;
-        _countryController.text = record.country ?? '';
+        _idNumberController.text = record.idNumber ?? '';
+        _firstNameController.text = record.firstName ?? '';
+        _lastNameController.text = record.lastName ?? '';
+        _selectedGender = record.gender;
+        _selectedMaritalStatus = record.maritalStatus;
+        _selectedDateOfBirth = record.dateOfBirth;
+        _selectedCrimeType = record.crimeType;
+        _selectedDateCommitted = record.dateCommitted;
+        
+        // Address fields
+        _countryController.text = record.country ?? 'Country not specified';
         _provinceController.text = record.province ?? '';
         _districtController.text = record.district ?? '';
         _sectorController.text = record.sector ?? '';
@@ -396,11 +404,10 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
         _villageController.text = record.village ?? '';
         _addressNowController.text = record.addressNow ?? '';
         _phoneController.text = record.phone ?? '';
-        _selectedCrimeType = record.crimeType;
         _descriptionController.text = record.description ?? '';
-        _selectedDateCommitted = record.dateCommitted;
       });
       
+      // Show the edit dialog
       _showAddCriminalDialog();
     }
 
@@ -442,32 +449,41 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ID Type
-                      DropdownSearch<String>(
-                        popupProps: const PopupProps.menu(showSearchBox: true),
-                        items: AppConstants.idTypes,
-                        selectedItem: _selectedIdType,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            _selectedIdType = value;
-                          });
-                        },
-                        dropdownDecoratorProps: DropDownDecoratorProps(
-                          dropdownSearchDecoration: InputDecoration(
-                          labelText: "ID Type *",
-                          border: OutlineInputBorder(),
+                      // ID Type (disabled when editing existing criminal)
+                      _isEditMode 
+                        ? CustomTextField(
+                            controller: TextEditingController(text: _selectedIdType ?? ''),
+                            hintText: 'ID Type',
+                            label: 'ID Type *',
+                            enabled: false,
+                            validator: (value) => value == null || value.isEmpty ? "Please select ID type" : null,
+                          )
+                        : DropdownSearch<String>(
+                            popupProps: const PopupProps.menu(showSearchBox: true),
+                            items: AppConstants.idTypes,
+                            selectedItem: _selectedIdType,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                _selectedIdType = value;
+                              });
+                            },
+                            dropdownDecoratorProps: const DropDownDecoratorProps(
+                              dropdownSearchDecoration: InputDecoration(
+                                labelText: "ID Type *",
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            validator: (value) => value == null ? "Please select ID type" : null,
                           ),
-                        ),
-                        validator: (value) => value == null ? "Please select ID type" : null,
-                      ),
                       const SizedBox(height: 16),
                       
-                      // ID Number
+                      // ID Number (disabled when editing existing criminal)
                       CustomTextField(
                         controller: _idNumberController,
                         hintText: 'Enter ID Number',
                         label: 'ID Number *',
-                        onChanged: (value) {
+                        enabled: !_isEditMode,
+                        onChanged: _isEditMode ? null : (value) {
                           if (value.length >= 8) {
                             _searchAndAutofill(value);
                           }
@@ -481,11 +497,12 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
                       ),
                       const SizedBox(height: 16),
                       
-                      // First Name
+                      // First Name (disabled when editing existing criminal)
                       CustomTextField(
                         controller: _firstNameController,
                         hintText: 'Enter First Name',
                         label: 'First Name *',
+                        enabled: !_isEditMode,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter first name';
@@ -495,11 +512,12 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
                       ),
                       const SizedBox(height: 16),
                       
-                      // Last Name
+                      // Last Name (disabled when editing existing criminal)
                       CustomTextField(
                         controller: _lastNameController,
                         hintText: 'Enter Last Name',
                         label: 'Last Name *',
+                        enabled: !_isEditMode,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter last name';
@@ -509,29 +527,37 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
                       ),
                       const SizedBox(height: 16),
                       
-                      // Gender
-                      DropdownSearch<String>(
-                        popupProps: const PopupProps.menu(showSearchBox: true),
-                        items: AppConstants.genderOptions,
-                        selectedItem: _selectedGender,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            _selectedGender = value;
-                          });
-                        },
-                        dropdownDecoratorProps: DropDownDecoratorProps(
-                          dropdownSearchDecoration: InputDecoration(
-                          labelText: "Gender *",
-                          border: OutlineInputBorder(),
+                      // Gender (disabled when editing existing criminal)
+                      _isEditMode 
+                        ? CustomTextField(
+                            controller: TextEditingController(text: _selectedGender ?? ''),
+                            hintText: 'Gender',
+                            label: 'Gender *',
+                            enabled: false,
+                            validator: (value) => value == null || value.isEmpty ? "Please select gender" : null,
+                          )
+                        : DropdownSearch<String>(
+                            popupProps: const PopupProps.menu(showSearchBox: true),
+                            items: AppConstants.genderOptions,
+                            selectedItem: _selectedGender,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                _selectedGender = value;
+                              });
+                            },
+                            dropdownDecoratorProps: const DropDownDecoratorProps(
+                              dropdownSearchDecoration: InputDecoration(
+                                labelText: "Gender *",
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            validator: (value) => value == null ? "Please select gender" : null,
                           ),
-                        ),
-                        validator: (value) => value == null ? "Please select gender" : null,
-                      ),
                       const SizedBox(height: 16),
                       
-                      // Date of Birth
+                      // Date of Birth (disabled when editing existing criminal)
                       InkWell(
-                        onTap: () async {
+                        onTap: _isEditMode ? null : () async {
                           final DateTime? picked = await showDatePicker(
                             context: context,
                             initialDate: _selectedDateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 20)),
@@ -549,6 +575,7 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey),
                             borderRadius: BorderRadius.circular(8),
+                            color: _isEditMode ? Colors.grey[100] : null,
                           ),
                           child: Row(
                             children: [
@@ -568,73 +595,87 @@ class _EnhancedCriminalManagementScreenState extends State<EnhancedCriminalManag
                       ),
                       const SizedBox(height: 16),
                       
-                      // Marital Status
-                      DropdownSearch<String>(
-                        popupProps: const PopupProps.menu(showSearchBox: true),
-                        items: AppConstants.maritalStatusOptions,
-                        selectedItem: _selectedMaritalStatus,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            _selectedMaritalStatus = value;
-                          });
-                        },
-                        dropdownDecoratorProps: DropDownDecoratorProps(
-                          dropdownSearchDecoration: InputDecoration(
-                          labelText: "Marital Status *",
-                          border: OutlineInputBorder(),
+                      // Marital Status (disabled when editing existing criminal)
+                      _isEditMode 
+                        ? CustomTextField(
+                            controller: TextEditingController(text: _selectedMaritalStatus ?? ''),
+                            hintText: 'Marital Status',
+                            label: 'Marital Status *',
+                            enabled: false,
+                            validator: (value) => value == null || value.isEmpty ? "Please select marital status" : null,
+                          )
+                        : DropdownSearch<String>(
+                            popupProps: const PopupProps.menu(showSearchBox: true),
+                            items: AppConstants.maritalStatusOptions,
+                            selectedItem: _selectedMaritalStatus,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                _selectedMaritalStatus = value;
+                              });
+                            },
+                            dropdownDecoratorProps: const DropDownDecoratorProps(
+                              dropdownSearchDecoration: InputDecoration(
+                                labelText: "Marital Status *",
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            validator: (value) => value == null ? "Please select marital status" : null,
                           ),
-                        ),
-                        validator: (value) => value == null ? "Please select marital status" : null,
-                      ),
                       const SizedBox(height: 16),
                       
                       // Conditional fields based on ID type
                       if (_selectedIdType == 'passport') ...[
-                        // Country
+                        // Country (disabled when editing existing criminal)
                         CustomTextField(
                           controller: _countryController,
                           hintText: 'Enter Country',
                           label: 'Country',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                       ] else ...[
-                        // Province
+                        // Province (disabled when editing existing criminal)
                         CustomTextField(
                           controller: _provinceController,
                           hintText: 'Enter Province',
                           label: 'Province',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                         
-                        // District
+                        // District (disabled when editing existing criminal)
                         CustomTextField(
                           controller: _districtController,
                           hintText: 'Enter District',
                           label: 'District',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                         
-                        // Sector
+                        // Sector (disabled when editing existing criminal)
                         CustomTextField(
                           controller: _sectorController,
                           hintText: 'Enter Sector',
                           label: 'Sector',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                         
-                        // Cell
+                        // Cell (disabled when editing existing criminal)
                         CustomTextField(
                           controller: _cellController,
                           hintText: 'Enter Cell',
                           label: 'Cell',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                         
-                        // Village
+                        // Village (disabled when editing existing criminal)
                         CustomTextField(
                           controller: _villageController,
                           hintText: 'Enter Village',
                           label: 'Village',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                       ],

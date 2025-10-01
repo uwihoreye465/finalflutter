@@ -59,9 +59,9 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
     bool _isEditMode = false;
     Victim? _editingVictim;
     
-    // File upload variables
-    List<File> _selectedFiles = [];
-    final ImagePicker _picker = ImagePicker();
+    // File upload variables (disabled)
+    // List<File> _selectedFiles = [];
+    // final ImagePicker _picker = ImagePicker();
 
     @override
     void initState() {
@@ -95,48 +95,31 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
       _applyFilters();
     }
 
+    // File upload disabled
     Future<void> _pickFiles() async {
-      try {
-        FilePickerResult? result = await FilePicker.platform.pickFiles(
-          allowMultiple: true,
-          type: FileType.any,
-        );
-
-        if (result != null) {
-          setState(() {
-            _selectedFiles = result.paths.map((path) => File(path!)).toList();
-          });
-        }
-      } catch (e) {
-        Fluttertoast.showToast(
-          msg: 'Error picking files: ${e.toString()}',
-          backgroundColor: AppColors.errorColor,
-          textColor: Colors.white,
-        );
-      }
+      Fluttertoast.showToast(
+        msg: 'File upload is disabled for victim records',
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
     }
 
+    // Image upload disabled
     Future<void> _pickImage() async {
-      try {
-        final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-        if (image != null) {
-          setState(() {
-            _selectedFiles.add(File(image.path));
-          });
-        }
-      } catch (e) {
-        Fluttertoast.showToast(
-          msg: 'Error picking image: ${e.toString()}',
-          backgroundColor: AppColors.errorColor,
-          textColor: Colors.white,
-        );
-      }
+      Fluttertoast.showToast(
+        msg: 'Image upload is disabled for victim records',
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
     }
 
+    // Remove file disabled
     void _removeFile(int index) {
-      setState(() {
-        _selectedFiles.removeAt(index);
-      });
+      Fluttertoast.showToast(
+        msg: 'File removal is disabled for victim records',
+        backgroundColor: AppColors.warningColor,
+        textColor: Colors.white,
+      );
     }
 
     Future<void> _loadVictims({bool refresh = false}) async {
@@ -365,12 +348,7 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
             crimeType: victim.crimeType,
             evidence: {
               'description': _evidenceDescriptionController.text.trim(),
-              'files': _selectedFiles.map((file) => {
-                'name': file.path.split('/').last,
-                'type': file.path.split('.').last,
-                'path': file.path,
-                'uploadedAt': DateTime.now().toIso8601String(),
-              }).toList(),
+              'files': [], // File upload disabled
               'uploadedAt': DateTime.now().toIso8601String(),
             },
             dateCommitted: victim.dateCommitted,
@@ -406,12 +384,7 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
             crimeType: victim.crimeType,
             evidence: {
               'description': _evidenceDescriptionController.text.trim(),
-              'files': _selectedFiles.map((file) => {
-                'name': file.path.split('/').last,
-                'type': file.path.split('.').last,
-                'path': file.path,
-                'uploadedAt': DateTime.now().toIso8601String(),
-              }).toList(),
+              'files': [], // File upload disabled
               'uploadedAt': DateTime.now().toIso8601String(),
             },
             dateCommitted: victim.dateCommitted,
@@ -484,17 +457,24 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
     }
 
     void _editVictim(Victim victim) {
+      // Enable editing functionality - populate form with existing data
       setState(() {
         _isEditMode = true;
         _editingVictim = victim;
-        _idNumberController.text = victim.idNumber;
-        _firstNameController.text = victim.firstName;
-        _lastNameController.text = victim.lastName;
-        _selectedGender = victim.gender;
-        _selectedDateOfBirth = victim.dateOfBirth;
-        _selectedMaritalStatus = victim.maritalStatus;
+        
+        
+        // Populate form fields with existing data
         _selectedIdType = victim.idType;
-        _countryController.text = victim.country ?? '';
+        _idNumberController.text = victim.idNumber ?? '';
+        _firstNameController.text = victim.firstName ?? '';
+        _lastNameController.text = victim.lastName ?? '';
+        _selectedGender = victim.gender;
+        _selectedMaritalStatus = victim.maritalStatus;
+        _selectedDateOfBirth = victim.dateOfBirth;
+        _selectedDateCommitted = victim.dateCommitted;
+        
+        // Address fields
+        _countryController.text = victim.country ?? 'Country not specified';
         _provinceController.text = victim.province ?? '';
         _districtController.text = victim.district ?? '';
         _sectorController.text = victim.sector ?? '';
@@ -504,11 +484,11 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
         _phoneController.text = victim.phone ?? '';
         _emailController.text = victim.victimEmail ?? '';
         _sinnerIdController.text = victim.sinnerIdentification ?? '';
-        _crimeTypeController.text = victim.crimeType;
+        _crimeTypeController.text = victim.crimeType ?? '';
         _evidenceDescriptionController.text = victim.evidence?['description'] ?? '';
-        _selectedDateCommitted = victim.dateCommitted;
       });
       
+      // Show the edit dialog
       _showAddVictimDialog();
     }
 
@@ -655,7 +635,7 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
       _selectedDateCommitted = null;
       _isEditMode = false;
       _editingVictim = null;
-      _selectedFiles.clear();
+      // _selectedFiles.clear(); // File upload disabled
     }
 
     void _showAddVictimDialog() {
@@ -711,11 +691,12 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                       ),
                       const SizedBox(height: 16),
                       
-                      // First Name
+                      // First Name (disabled when editing existing victim)
                       CustomTextField(
                         controller: _firstNameController,
                         hintText: 'Enter First Name',
                         label: 'First Name *',
+                        enabled: !_isEditMode,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter first name';
@@ -725,11 +706,12 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                       ),
                       const SizedBox(height: 16),
                       
-                      // Last Name
+                      // Last Name (disabled when editing existing victim)
                       CustomTextField(
                         controller: _lastNameController,
                         hintText: 'Enter Last Name',
                         label: 'Last Name *',
+                        enabled: !_isEditMode,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter last name';
@@ -739,29 +721,37 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                       ),
                       const SizedBox(height: 16),
                       
-                      // Gender
-                      DropdownSearch<String>(
-                        popupProps: const PopupProps.menu(showSearchBox: true),
-                        items: AppConstants.genderOptions,
-                        selectedItem: _selectedGender,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            _selectedGender = value;
-                          });
-                        },
-                        dropdownDecoratorProps: DropDownDecoratorProps(
-                          dropdownSearchDecoration: InputDecoration(
-                          labelText: "Gender *",
-                          border: OutlineInputBorder(),
+                      // Gender (disabled when editing existing victim)
+                      _isEditMode 
+                        ? CustomTextField(
+                            controller: TextEditingController(text: _selectedGender ?? ''),
+                            hintText: 'Gender',
+                            label: 'Gender *',
+                            enabled: false,
+                            validator: (value) => value == null || value.isEmpty ? "Please select gender" : null,
+                          )
+                        : DropdownSearch<String>(
+                            popupProps: const PopupProps.menu(showSearchBox: true),
+                            items: AppConstants.genderOptions,
+                            selectedItem: _selectedGender,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                _selectedGender = value;
+                              });
+                            },
+                            dropdownDecoratorProps: const DropDownDecoratorProps(
+                              dropdownSearchDecoration: InputDecoration(
+                                labelText: "Gender *",
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            validator: (value) => value == null ? "Please select gender" : null,
                           ),
-                        ),
-                        validator: (value) => value == null ? "Please select gender" : null,
-                      ),
                       const SizedBox(height: 16),
                       
-                      // Date of Birth
+                      // Date of Birth (disabled when editing existing victim)
                       InkWell(
-                        onTap: () async {
+                        onTap: _isEditMode ? null : () async {
                           final DateTime? picked = await showDatePicker(
                             context: context,
                             initialDate: _selectedDateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 20)),
@@ -779,6 +769,7 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey),
                             borderRadius: BorderRadius.circular(8),
+                            color: _isEditMode ? Colors.grey[100] : null,
                           ),
                           child: Row(
                             children: [
@@ -798,73 +789,87 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                       ),
                       const SizedBox(height: 16),
                       
-                      // Marital Status
-                      DropdownSearch<String>(
-                        popupProps: const PopupProps.menu(showSearchBox: true),
-                        items: AppConstants.maritalStatusOptions,
-                        selectedItem: _selectedMaritalStatus,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            _selectedMaritalStatus = value;
-                          });
-                        },
-                        dropdownDecoratorProps: DropDownDecoratorProps(
-                          dropdownSearchDecoration: InputDecoration(
-                          labelText: "Marital Status *",
-                          border: OutlineInputBorder(),
+                      // Marital Status (disabled when editing existing victim)
+                      _isEditMode 
+                        ? CustomTextField(
+                            controller: TextEditingController(text: _selectedMaritalStatus ?? ''),
+                            hintText: 'Marital Status',
+                            label: 'Marital Status *',
+                            enabled: false,
+                            validator: (value) => value == null || value.isEmpty ? "Please select marital status" : null,
+                          )
+                        : DropdownSearch<String>(
+                            popupProps: const PopupProps.menu(showSearchBox: true),
+                            items: AppConstants.maritalStatusOptions,
+                            selectedItem: _selectedMaritalStatus,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                _selectedMaritalStatus = value;
+                              });
+                            },
+                            dropdownDecoratorProps: const DropDownDecoratorProps(
+                              dropdownSearchDecoration: InputDecoration(
+                                labelText: "Marital Status *",
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            validator: (value) => value == null ? "Please select marital status" : null,
                           ),
-                        ),
-                        validator: (value) => value == null ? "Please select marital status" : null,
-                      ),
                       const SizedBox(height: 16),
                       
                       // Conditional fields based on ID type
                       if (_selectedIdType == 'passport') ...[
-                        // Country
+                        // Country (disabled when editing existing victim)
                         CustomTextField(
                           controller: _countryController,
                           hintText: 'Enter Country',
                           label: 'Country',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                       ] else ...[
-                        // Province
+                        // Province (disabled when editing existing victim)
                         CustomTextField(
                           controller: _provinceController,
                           hintText: 'Enter Province',
                           label: 'Province',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                         
-                        // District
+                        // District (disabled when editing existing victim)
                         CustomTextField(
                           controller: _districtController,
                           hintText: 'Enter District',
                           label: 'District',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                         
-                        // Sector
+                        // Sector (disabled when editing existing victim)
                         CustomTextField(
                           controller: _sectorController,
                           hintText: 'Enter Sector',
                           label: 'Sector',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                         
-                        // Cell
+                        // Cell (disabled when editing existing victim)
                         CustomTextField(
                           controller: _cellController,
                           hintText: 'Enter Cell',
                           label: 'Cell',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                         
-                        // Village
+                        // Village (disabled when editing existing victim)
                         CustomTextField(
                           controller: _villageController,
                           hintText: 'Enter Village',
                           label: 'Village',
+                          enabled: !_isEditMode,
                         ),
                         const SizedBox(height: 16),
                       ],
@@ -934,76 +939,7 @@ class _EnhancedVictimManagementScreenState extends State<EnhancedVictimManagemen
                       ),
                       const SizedBox(height: 16),
                       
-                      // File Upload Section
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Evidence Files',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: _pickFiles,
-                                    icon: const Icon(Icons.attach_file),
-                                    label: const Text('Pick Files'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primaryColor,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: _pickImage,
-                                    icon: const Icon(Icons.image),
-                                    label: const Text('Pick Image'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.secondaryColor,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_selectedFiles.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Selected Files:',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              ..._selectedFiles.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final file = entry.value;
-                                return Card(
-                                  child: ListTile(
-                                    leading: const Icon(Icons.attach_file),
-                                    title: Text(file.path.split('/').last),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () => _removeFile(index),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ],
-                          ],
-                        ),
-                      ),
+                      // File Upload Section (REMOVED - No file upload functionality)
                       const SizedBox(height: 16),
                       
                       // Date Committed
